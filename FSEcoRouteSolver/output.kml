@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Document id="Document" xmlns="http://www.opengis.net/kml/2.2">
+  <Folder id="airport-0">
+    <name>Solution Airports 0</name>
+    <Placemark id="KCLT-0">
+      <name>KCLT</name>
+      <Point>
+        <coordinates>-80.943100000000001,35.213999999999999</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KEQY-0">
+      <name>KEQY</name>
+      <Point>
+        <coordinates>-80.620199999999997,35.018799999999999</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="8A6-0">
+      <name>8A6</name>
+      <Point>
+        <coordinates>-80.670100000000005,35.213799999999999</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KIPJ-0">
+      <name>KIPJ</name>
+      <Point>
+        <coordinates>-81.161299999999997,35.4833</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="NC14-0">
+      <name>NC14</name>
+      <Point>
+        <coordinates>-81.639499999999998,36.196800000000003</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="0A9-0">
+      <name>0A9</name>
+      <Point>
+        <coordinates>-82.173400000000001,36.371200000000002</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KFQD-0">
+      <name>KFQD</name>
+      <Point>
+        <coordinates>-81.935100000000006,35.428199999999997</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KGSP-0">
+      <name>KGSP</name>
+      <Point>
+        <coordinates>-82.218900000000005,34.895699999999998</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="SC72-0">
+      <name>SC72</name>
+      <Point>
+        <coordinates>-82.148200000000003,34.822899999999997</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="0A2-0">
+      <name>0A2</name>
+      <Point>
+        <coordinates>-82.567899999999995,34.090400000000002</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="27J-0">
+      <name>27J</name>
+      <Point>
+        <coordinates>-81.639700000000005,34.3093</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KUZA-0">
+      <name>KUZA</name>
+      <Point>
+        <coordinates>-81.057199999999995,34.9878</coordinates>
+      </Point>
+    </Placemark>
+  </Folder>
+</Document>
