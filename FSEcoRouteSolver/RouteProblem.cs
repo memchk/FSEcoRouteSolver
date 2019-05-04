@@ -379,7 +379,7 @@ namespace FSEcoRouteSolver
                         }
                         else
                         {
-                            this.CostMatrix[i, j] = (long)Haversine.calculate(nodes[i].Lat, nodes[i].Lon, nodes[j].Lat, nodes[j].Lon) * cpnm;
+                            this.CostMatrix[i, j] = (long)Haversine.Calculate(nodes[i].Lat, nodes[i].Lon, nodes[j].Lat, nodes[j].Lon) * cpnm;
                         }
                     }
                 }

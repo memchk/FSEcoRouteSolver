@@ -1,11 +1,15 @@
-﻿namespace FSEcoRouteSolver
+﻿// <copyright file="MainWindow.xaml.cs" company="Carson Page">
+// Copyright (c) Carson Page. All rights reserved.
+// </copyright>
+
+namespace FSEcoRouteSolver
 {
     using System;
     using System.Threading.Tasks;
     using System.Windows;
 
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// Interaction logic for MainWindow.xaml.
     /// </summary>
     public partial class MainWindow : Window
     {
@@ -40,7 +44,7 @@
                 MaxSolveSec = solveTime,
                 MaxLength = maxLength,
                 MaxTimeEnroute = maxTime,
-                HubICAO = icao
+                HubICAO = icao,
             };
 
             var solveTask = Task.Run(() =>

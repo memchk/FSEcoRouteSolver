@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// <copyright file="RoutingProblemParameters.cs" company="Carson Page">
+// Copyright (c) Carson Page. All rights reserved.
+// </copyright>
 
 namespace FSEcoRouteSolver
 {
-    class RoutingProblemParameters
+    internal class RoutingProblemParameters
     {
         public int NumAircraft { get; set; }
 
