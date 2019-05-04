@@ -20,26 +20,10 @@
                             <Label Width="{DynamicResource LabelWidth}" Content="Hub ICAO"/>
                             <TextBox x:Name="tICAO" Width="{DynamicResource DataInputWidth}" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <Label Width="{DynamicResource LabelWidth}" Content="Cost Per NM"/>
-                            <TextBox x:Name="tCPNM" Width="{DynamicResource DataInputWidth}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <Label Width="{DynamicResource LabelWidth}" Content="Pax. Capacity"/>
-                            <TextBox x:Name="tPaxCapacity" Width="{DynamicResource DataInputWidth}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <Label Width="{DynamicResource LabelWidth}" Content="Cruise Speed (knots)"/>
-                            <TextBox x:Name="tSpd" Width="{DynamicResource DataInputWidth}" />
-                        </StackPanel>
                         <ProgressBar x:Name="pSolveTime" Height="30" Minimum="0" />
                     </StackPanel>
                     <Border BorderThickness="1,0,0,0" BorderBrush="Gray">
                         <StackPanel Orientation="Vertical" Margin="10,0,0,0">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <Label Width="{DynamicResource LabelWidth}" Content="Number of Aircraft"/>
-                                <TextBox x:Name="tNumberOfAircraft" Width="{DynamicResource DataInputWidth}" />
-                            </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <Label Width="{DynamicResource LabelWidth}" Content="Max Length (NM)"/>
                                 <TextBox x:Name="tMaxLength" Width="{DynamicResource DataInputWidth}" />
@@ -71,7 +55,8 @@
                     </ComboBox>
                     <Button x:Name="bAddAircraft" Content="Add Aircraft" Padding="3" Click="AddAircraft_Click"/>
                 </StackPanel>
-                <DataGrid x:Name="tFleet" AutoGenerateColumns="True" >
+                <DataGrid x:Name="tFleet">
+                    
                 </DataGrid>
             </DockPanel>
         </TabItem>

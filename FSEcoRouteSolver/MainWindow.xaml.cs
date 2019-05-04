@@ -7,6 +7,7 @@ namespace FSEcoRouteSolver
     using System;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
+    using System.Linq;
     using System.Threading.Tasks;
     using System.Windows;
 
@@ -32,28 +33,24 @@ namespace FSEcoRouteSolver
 
         private async void BSolve_ClickAsync(object sender, RoutedEventArgs e)
         {
+
             var solveTime = int.Parse(this.tMaxSolveTime.Text);
-            var numOfAircraft = int.Parse(this.tNumberOfAircraft.Text);
-            var cpnm = (int)Math.Round(double.Parse(this.tCPNM.Text) * 100);
-            var paxCapacity = int.Parse(this.tPaxCapacity.Text);
-            var maxLength = (int)Math.Round(double.Parse(this.tMaxLength.Text) * 100);
-            var maxTime = (int)Math.Round(double.Parse(this.tMaxEnrouteTime.Text) * 100);
-            var spd = int.Parse(this.tSpd.Text);
-            var icao = this.tICAO.Text;
 
             this.pSolveTime.IsIndeterminate = true;
             this.tResult.Text = "Solver running for " + solveTime + " seconds. Results will appear here.";
 
+            var icao = this.tICAO.Text;
+            var maxTime = (int)Math.Round(double.Parse(this.tMaxEnrouteTime.Text) * 100);
+            var maxLength = (int)Math.Round(double.Parse(this.tMaxLength.Text) * 100);
+            var filteredAircraft = this.aircraftFleet.Where(a => a.Location == icao).ToList();
+
             var routingParameters = new RoutingProblemParameters
             {
-                NumAircraft = numOfAircraft,
-                CostPerNM = cpnm,
-                PaxCapacity = paxCapacity,
-                AircraftSpeed = spd,
-                MaxSolveSec = solveTime,
-                MaxLength = maxLength,
-                MaxTimeEnroute = maxTime,
+                Fleet = filteredAircraft,
                 HubICAO = icao,
+                MaxTimeEnroute = maxTime,
+                MaxLength = maxLength,
+                MaxSolveSec = solveTime,
             };
 
             var solveTask = Task.Run(() =>
@@ -70,10 +67,9 @@ namespace FSEcoRouteSolver
         private void AddAircraft_Click(object sender, RoutedEventArgs e)
         {
             var aircraft = (Aircraft)this.cAircraftList.SelectedItem;
-            var ownedAircraft = new OwnedAircraft(aircraft);
-
             if (aircraft != null)
             {
+                var ownedAircraft = new OwnedAircraft(aircraft);
                 this.aircraftFleet.Add(ownedAircraft);
             }
         }

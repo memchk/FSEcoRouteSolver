@@ -4,22 +4,18 @@
 
 namespace FSEcoRouteSolver
 {
+    using System.Collections.Generic;
+
     internal class RoutingProblemParameters
     {
-        public int NumAircraft { get; set; }
-
-        public int PaxCapacity { get; set; }
-
-        public int CostPerNM { get; set; }
-
         public int MaxLength { get; set; }
 
         public int MaxSolveSec { get; set; }
 
         public int MaxTimeEnroute { get; set; }
 
-        public int AircraftSpeed { get; set; }
-
         public string HubICAO { get; set; }
+
+        public List<OwnedAircraft> Fleet { get; set; }
     }
 }

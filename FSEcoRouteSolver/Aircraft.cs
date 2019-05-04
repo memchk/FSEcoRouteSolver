@@ -16,16 +16,31 @@ namespace FSEcoRouteSolver
 
     internal class Aircraft
     {
-        [Name("GPH")]
-        public double GallonsPerHour { get; private set; }
+        public Aircraft()
+        {
+        }
+
+        protected Aircraft(double gallonsPerHour, string makeModel, int crew, int seats, int cruiseSpeed)
+        {
+            this.GallonsPerHour = gallonsPerHour;
+            this.MakeModel = makeModel;
+            this.Crew = crew;
+            this.Seats = seats;
+            this.CruiseSpeed = cruiseSpeed;
+        }
 
         public string MakeModel { get; private set; }
 
-        public int Crew { get; private set; }
+        public int CruiseSpeed { get; private set; }
+
+        [Name("GPH")]
+        public double GallonsPerHour { get; private set; }
 
         public int Seats { get; private set; }
 
-        public int CruiseSpeed { get; private set; }
+        public int Crew { get; private set; }
+
+        public int Passengers { get => this.Seats - this.Crew - 1; }
 
         /// <summary>
         /// Get a list of in game aircraft given an FSE key.
@@ -43,6 +58,11 @@ namespace FSEcoRouteSolver
         public double CostPerNM(double fuelPrice)
         {
             return (this.GallonsPerHour * fuelPrice) / this.CruiseSpeed;
+        }
+
+        public int CostPerNMCents(double fuelPrice)
+        {
+            return (int)Math.Round(this.CostPerNM(fuelPrice) * 100);
         }
     }
 }

@@ -8,76 +8,121 @@
         <coordinates>-80.943100000000001,35.213999999999999</coordinates>
       </Point>
     </Placemark>
-    <Placemark id="8A6-0">
-      <name>8A6</name>
-      <Point>
-        <coordinates>-80.670100000000005,35.213799999999999</coordinates>
-      </Point>
-    </Placemark>
     <Placemark id="KEQY-0">
       <name>KEQY</name>
       <Point>
         <coordinates>-80.620199999999997,35.018799999999999</coordinates>
       </Point>
     </Placemark>
-    <Placemark id="45J-0">
-      <name>45J</name>
+    <Placemark id="KAFP-0">
+      <name>KAFP</name>
       <Point>
-        <coordinates>-79.759100000000004,34.891100000000002</coordinates>
+        <coordinates>-80.081299999999999,35.024000000000001</coordinates>
       </Point>
     </Placemark>
-    <Placemark id="KMEB-0">
-      <name>KMEB</name>
+    <Placemark id="47J-0">
+      <name>47J</name>
       <Point>
-        <coordinates>-79.365799999999993,34.791899999999998</coordinates>
+        <coordinates>-79.957899999999995,34.712600000000002</coordinates>
       </Point>
     </Placemark>
-    <Placemark id="2GC-0">
-      <name>2GC</name>
+    <Placemark id="3J0-0">
+      <name>3J0</name>
       <Point>
-        <coordinates>-78.843500000000006,34.893700000000003</coordinates>
+        <coordinates>-81.083200000000005,32.867699999999999</coordinates>
       </Point>
     </Placemark>
-    <Placemark id="14NC-0">
-      <name>14NC</name>
+    <Placemark id="6J6-0">
+      <name>6J6</name>
       <Point>
-        <coordinates>-77.549999999999997,34.5167</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="13NC-0">
-      <name>13NC</name>
-      <Point>
-        <coordinates>-77.249700000000004,35.033499999999997</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="KAKH-0">
-      <name>KAKH</name>
-      <Point>
-        <coordinates>-81.149900000000002,35.2027</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="KIPJ-0">
-      <name>KIPJ</name>
-      <Point>
-        <coordinates>-81.161299999999997,35.4833</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="0A9-0">
-      <name>0A9</name>
-      <Point>
-        <coordinates>-82.173400000000001,36.371200000000002</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="KFQD-0">
-      <name>KFQD</name>
-      <Point>
-        <coordinates>-81.935100000000006,35.428199999999997</coordinates>
+        <coordinates>-81.819599999999994,33.736800000000002</coordinates>
       </Point>
     </Placemark>
     <Placemark id="0A2-0">
       <name>0A2</name>
       <Point>
         <coordinates>-82.567899999999995,34.090400000000002</coordinates>
+      </Point>
+    </Placemark>
+  </Folder>
+  <Folder id="airport-1">
+    <name>Solution Airports 1</name>
+    <Placemark id="KCLT-1">
+      <name>KCLT</name>
+      <Point>
+        <coordinates>-80.943100000000001,35.213999999999999</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="N52-1">
+      <name>N52</name>
+      <Point>
+        <coordinates>-80.748000000000005,34.863799999999998</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KMEB-1">
+      <name>KMEB</name>
+      <Point>
+        <coordinates>-79.365799999999993,34.791899999999998</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="2GC-1">
+      <name>2GC</name>
+      <Point>
+        <coordinates>-78.843500000000006,34.893700000000003</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="14NC-1">
+      <name>14NC</name>
+      <Point>
+        <coordinates>-77.549999999999997,34.5167</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="13NC-1">
+      <name>13NC</name>
+      <Point>
+        <coordinates>-77.249700000000004,35.033499999999997</coordinates>
+      </Point>
+    </Placemark>
+  </Folder>
+  <Folder id="airport-2">
+    <name>Solution Airports 2</name>
+    <Placemark id="KCLT-2">
+      <name>KCLT</name>
+      <Point>
+        <coordinates>-80.943100000000001,35.213999999999999</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KAKH-2">
+      <name>KAKH</name>
+      <Point>
+        <coordinates>-81.149900000000002,35.2027</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="34A-2">
+      <name>34A</name>
+      <Point>
+        <coordinates>-81.947199999999995,34.507100000000001</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KUZA-2">
+      <name>KUZA</name>
+      <Point>
+        <coordinates>-81.057199999999995,34.9878</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="27J-2">
+      <name>27J</name>
+      <Point>
+        <coordinates>-81.639700000000005,34.3093</coordinates>
+      </Point>
+    </Placemark>
+  </Folder>
+  <Folder id="airport-3">
+    <name>Solution Airports 3</name>
+    <Placemark id="KCLT-3">
+      <name>KCLT</name>
+      <Point>
+        <coordinates>-80.943100000000001,35.213999999999999</coordinates>
       </Point>
     </Placemark>
   </Folder>

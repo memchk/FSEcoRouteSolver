@@ -24,6 +24,8 @@ namespace FSEcoRouteSolver
         private readonly RoutingIndexManager manager;
         private readonly RoutingProblemParameters parameters;
 
+        // private readonly List<GreatCircleDistance> costEvaluators;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="RouteProblem"/> class.
         /// </summary>
@@ -33,6 +35,7 @@ namespace FSEcoRouteSolver
         {
             this.parameters = parameters;
             var hub = this.parameters.HubICAO;
+            var fleet = this.parameters.Fleet;
 
             var icaodata = new CsvReader(File.OpenText(@"./icaodata.csv"));
             var icaodata_records = icaodata.GetRecords<IcaoDataRecord>().ToDictionary(x => x.icao, x => x);
@@ -117,7 +120,7 @@ namespace FSEcoRouteSolver
                 }
             }
 
-            this.manager = new RoutingIndexManager(this.nodes.Count, this.parameters.NumAircraft, 0);
+            this.manager = new RoutingIndexManager(this.nodes.Count, fleet.Count, 0);
             this.model = new RoutingModel(this.manager);
 
             this.SetupDimensions();
@@ -126,8 +129,15 @@ namespace FSEcoRouteSolver
         public void EnableBookingFee()
         {
             var assignmentCount = this.model.GetMutableDimension("assignment_count");
-            var bookingNeg = -this.parameters.PaxCapacity;
-            this.model.AddConstantDimensionWithSlack(bookingNeg, this.parameters.PaxCapacity, 2 * this.parameters.PaxCapacity, true, "booking_fee");
+            var fleet = this.parameters.Fleet;
+            var paxCapacities = fleet.Select(a => (long)a.Passengers).ToArray();
+            var maxCapacity = paxCapacities.Max();
+
+            var bfCalls = paxCapacities.Select(c => this.model.RegisterUnaryTransitCallback(
+                (long index) => -c)).ToArray();
+
+            this.model.AddDimensionWithVehicleTransitAndCapacity(bfCalls, maxCapacity * 2, paxCapacities, true, "booking_fee");
+
             var bookingFee = this.model.GetMutableDimension("booking_fee");
             var totalPay = this.nodes.Select(n => n.Pay).Sum();
             this.model.AddConstantDimensionWithSlack(0, totalPay, totalPay, true, "bf_prime");
@@ -144,7 +154,7 @@ namespace FSEcoRouteSolver
                 solver.Add(acGtFive * bookingFee.CumulVar(ii) >= acGtFive * assignmentCount.CumulVar(ii));
 
                 var notNextIsZero = (assignmentCount.TransitVar(ii) + assignmentCount.CumulVar(ii)) != 0;
-                var delBookingFee = bookingFee.SlackVar(ii) + bookingNeg;
+                var delBookingFee = bookingFee.SlackVar(ii) + bookingFee.TransitVar(ii);
 
                 solver.Add((notNextIsZero * delBookingFee) >= 0);
             }
@@ -165,6 +175,8 @@ namespace FSEcoRouteSolver
         public string Solve()
         {
             var solver = this.model.solver();
+            var fleet = this.parameters.Fleet;
+
             var distance = this.model.GetMutableDimension("distance");
             foreach (var pair in this.pdpPairs)
             {
@@ -176,15 +188,14 @@ namespace FSEcoRouteSolver
                 solver.Add(distance.CumulVar(pickup_idx) <= distance.CumulVar(delivery_idx));
                 solver.Add(this.model.VehicleVar(pickup_idx) == this.model.VehicleVar(delivery_idx));
 
-                solver.Add(this.model.ActiveVar(pickup_idx) == this.model.ActiveVar(delivery_idx));
+                // solver.Add(this.model.ActiveVar(pickup_idx) == this.model.ActiveVar(delivery_idx));
 
-                this.model.AddDisjunction(new long[] { pickup_idx }, this.nodes[pickup].Pay);
-                this.model.AddDisjunction(new long[] { delivery_idx }, this.nodes[delivery].Pay);
+                this.model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, this.nodes[delivery].Pay, 2);
             }
 
             var routingParameters = operations_research_constraint_solver.DefaultRoutingSearchParameters();
             routingParameters.LocalSearchMetaheuristic = LocalSearchMetaheuristic.Types.Value.GuidedLocalSearch;
-            routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.LocalCheapestInsertion;
+            routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.LocalCheapestArc;
             routingParameters.LogSearch = true;
             routingParameters.TimeLimit = new Duration { Seconds = this.parameters.MaxSolveSec };
 
@@ -204,7 +215,7 @@ namespace FSEcoRouteSolver
             {
                 Id = "Document",
             };
-            for (int i = 0; i < this.parameters.NumAircraft; ++i)
+            for (int i = 0; i < this.parameters.Fleet.Count; ++i)
             {
                 var routeAirport = new Folder
                 {
@@ -273,14 +284,35 @@ namespace FSEcoRouteSolver
 
         private void SetupDimensions()
         {
-            var distanceCostCall = new GreatCircleDistance(this.manager, this.parameters.CostPerNM, this.nodes);
-            this.model.SetArcCostEvaluatorOfAllVehicles(this.model.RegisterTransitCallback(distanceCostCall.Call));
+            var fleet = this.parameters.Fleet;
+
+            var paxCapacities = fleet.Select(a => (long)a.Passengers).ToArray();
+
+            var costEvalulators = this.parameters.Fleet
+                .Select(a => new GreatCircleDistance(this.manager, a.CostPerNMCents(4.19), this.nodes)).ToList();
+
+            for (int i = 0; i < costEvalulators.Count; i++)
+            {
+                var call = this.model.RegisterTransitCallback(costEvalulators[i].Call);
+                this.model.SetArcCostEvaluatorOfVehicle(call, i);
+            }
 
             var distanceCall = new GreatCircleDistance(this.manager, 100, this.nodes);
             this.model.AddDimension(this.model.RegisterTransitCallback(distanceCall.Call), 0, this.parameters.MaxLength, true, "distance");
 
-            var timeCall = new TimeEvaluator(distanceCall, this.manager, this.parameters.AircraftSpeed, this.nodes);
-            this.model.AddDimension(this.model.RegisterTransitCallback(timeCall.Call), 0, this.parameters.MaxTimeEnroute, true, "time");
+            var timeEvaluators = new List<TimeEvaluator>();
+            for (int i = 0; i < fleet.Count; i++)
+            {
+                var timeCall = new TimeEvaluator(costEvalulators[i], this.manager, fleet[i].CruiseSpeed, this.nodes);
+                timeEvaluators.Add(timeCall);
+            }
+
+            this.model.AddDimensionWithVehicleTransits(
+                timeEvaluators.Select(e => this.model.RegisterTransitCallback(e.Call)).ToArray(),
+                0,
+                this.parameters.MaxTimeEnroute,
+                true,
+                "time");
 
             int assignmentCallBackIndex = this.model.RegisterUnaryTransitCallback(
                 (long fromIndex) =>
@@ -288,10 +320,11 @@ namespace FSEcoRouteSolver
                     var fromNode = this.manager.IndexToNode(fromIndex);
                     return Math.Sign(this.nodes[fromNode].Demand);
                 });
-            this.model.AddDimension(
+
+            this.model.AddDimensionWithVehicleCapacity(
               assignmentCallBackIndex,
               0,  // null capacity slack
-              this.parameters.PaxCapacity,   // vehicle maximum capacities
+              paxCapacities,   // vehicle maximum capacities
               true,                      // start cumul to zero
               "assignment_count");
             var assignmentCount = this.model.GetMutableDimension("assignment_count");
@@ -304,10 +337,10 @@ namespace FSEcoRouteSolver
                     return this.nodes[fromNode].Demand;
                 });
 
-            this.model.AddDimension(
+            this.model.AddDimensionWithVehicleCapacity(
               demandCallbackIndex,
               0,  // null capacity slack
-              this.parameters.PaxCapacity,   // vehicle maximum capacities
+              paxCapacities,   // vehicle maximum capacities
               true,                      // start cumul to zero
               "capacity");
 
