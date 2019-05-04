@@ -60,6 +60,7 @@
     </ApplicationDefinition>
     <Compile Include="Aircraft.cs" />
     <Compile Include="Haversine.cs" />
+    <Compile Include="OwnedAircraft.cs" />
     <Compile Include="RouteProblem.cs" />
     <Compile Include="RoutingProblemParameters.cs" />
     <Page Include="MainWindow.xaml">

@@ -62,15 +62,16 @@
         <TabItem Header="Aircraft Fleet">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,15">
-                    <ComboBox x:Name="cAircraftList" Width="{DynamicResource DataInputWidth}" Margin="0,0,15,0" />
-                    <Button Content="Add Aircraft" Padding="3"/>
+                    <ComboBox x:Name="cAircraftList" Width="{DynamicResource DataInputWidth}" Margin="0,0,15,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding MakeModel}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button x:Name="bAddAircraft" Content="Add Aircraft" Padding="3" Click="AddAircraft_Click"/>
                 </StackPanel>
-                <DataGrid AutoGenerateColumns="False" >
-                    <DataGrid.Columns>
-                        <DataGridComboBoxColumn Header="Aircraft Type"/>
-                        <DataGridTextColumn Header="Registration"/>
-                        <DataGridTextColumn Header="Hub ICAO"/>
-                    </DataGrid.Columns>
+                <DataGrid x:Name="tFleet" AutoGenerateColumns="True" >
                 </DataGrid>
             </DockPanel>
         </TabItem>

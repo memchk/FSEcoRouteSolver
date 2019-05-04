@@ -5,6 +5,8 @@
 namespace FSEcoRouteSolver
 {
     using System;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using System.Threading.Tasks;
     using System.Windows;
 
@@ -13,12 +15,19 @@ namespace FSEcoRouteSolver
     /// </summary>
     public partial class MainWindow : Window
     {
+        private readonly List<Aircraft> aircraftList;
+        private readonly ObservableCollection<OwnedAircraft> aircraftFleet;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MainWindow"/> class.
         /// </summary>
         public MainWindow()
         {
             this.InitializeComponent();
+            this.aircraftList = Aircraft.ListFromFSEconomy("BFE0D0F58A7F8EC6");
+            this.cAircraftList.ItemsSource = this.aircraftList;
+            this.aircraftFleet = new ObservableCollection<OwnedAircraft>();
+            this.tFleet.ItemsSource = this.aircraftFleet;
         }
 
         private async void BSolve_ClickAsync(object sender, RoutedEventArgs e)
@@ -56,6 +65,17 @@ namespace FSEcoRouteSolver
 
             this.tResult.Text = await solveTask;
             this.pSolveTime.IsIndeterminate = false;
+        }
+
+        private void AddAircraft_Click(object sender, RoutedEventArgs e)
+        {
+            var aircraft = (Aircraft)this.cAircraftList.SelectedItem;
+            var ownedAircraft = new OwnedAircraft(aircraft);
+
+            if (aircraft != null)
+            {
+                this.aircraftFleet.Add(ownedAircraft);
+            }
         }
     }
 }

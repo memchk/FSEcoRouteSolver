@@ -35,8 +35,14 @@ namespace FSEcoRouteSolver
         public static List<Aircraft> ListFromFSEconomy(string api_key)
         {
             var webClient = new WebClient();
-            var aircraftCsv = new CsvReader(new StringReader(webClient.DownloadString(string.Format("http://server.fseconomy.net/data?userkey={0}&format=xml&query=aircraft&search=configs", api_key))));
+            var aircraftCsv = new CsvReader(new StringReader(webClient.DownloadString(string.Format("http://server.fseconomy.net/data?userkey={0}&format=csv&query=aircraft&search=configs", api_key))));
+            aircraftCsv.Configuration.IncludePrivateMembers = true;
             return aircraftCsv.GetRecords<Aircraft>().ToList();
+        }
+
+        public double CostPerNM(double fuelPrice)
+        {
+            return (this.GallonsPerHour * fuelPrice) / this.CruiseSpeed;
         }
     }
 }
