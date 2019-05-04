@@ -1,43 +1,57 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-
-namespace FSEcoRouteSolver
+﻿namespace FSEcoRouteSolver
 {
+    using System;
+    using System.Threading.Tasks;
+    using System.Windows;
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MainWindow"/> class.
+        /// </summary>
         public MainWindow()
         {
-            InitializeComponent();
+            this.InitializeComponent();
         }
 
-        private void BSolve_Click(object sender, RoutedEventArgs e)
+        private async void BSolve_ClickAsync(object sender, RoutedEventArgs e)
         {
-            RouteProblem rp = new RouteProblem(tICAO.Text, "A766DDB58CD76287");
-            tResult.Text = rp.Solve(
-                int.Parse(tNumberOfAircraft.Text), 
-                int.Parse(tCPNM.Text), 
-                int.Parse(tPaxCapacity.Text), 
-                (int)Math.Round(double.Parse(tMaxLength.Text)*100), 
-                int.Parse(tMaxSolveTime.Text),
-                (int)Math.Round(double.Parse(tMaxEnrouteTime.Text) * 100),
-                int.Parse(tSpd.Text)
-            );
+            var solveTime = int.Parse(this.tMaxSolveTime.Text);
+            var numOfAircraft = int.Parse(this.tNumberOfAircraft.Text);
+            var cpnm = (int)Math.Round(double.Parse(this.tCPNM.Text) * 100);
+            var paxCapacity = int.Parse(this.tPaxCapacity.Text);
+            var maxLength = (int)Math.Round(double.Parse(this.tMaxLength.Text) * 100);
+            var maxTime = (int)Math.Round(double.Parse(this.tMaxEnrouteTime.Text) * 100);
+            var spd = int.Parse(this.tSpd.Text);
+            var icao = this.tICAO.Text;
 
+            this.pSolveTime.IsIndeterminate = true;
+            this.tResult.Text = "Solver running for " + solveTime + " seconds. Results will appear here.";
+
+            var routingParameters = new RoutingProblemParameters
+            {
+                NumAircraft = numOfAircraft,
+                CostPerNM = cpnm,
+                PaxCapacity = paxCapacity,
+                AircraftSpeed = spd,
+                MaxSolveSec = solveTime,
+                MaxLength = maxLength,
+                MaxTimeEnroute = maxTime,
+                HubICAO = icao
+            };
+
+            var solveTask = Task.Run(() =>
+            {
+                RouteProblem rp = new RouteProblem(routingParameters, "BFE0D0F58A7F8EC6");
+                rp.EnableBookingFee();
+                return rp.Solve();
+            });
+
+            this.tResult.Text = await solveTask;
+            this.pSolveTime.IsIndeterminate = false;
         }
     }
 }

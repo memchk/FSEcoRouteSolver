@@ -6,53 +6,73 @@
         xmlns:local="clr-namespace:FSEcoRouteSolver"
         xmlns:System="clr-namespace:System;assembly=mscorlib" x:Class="FSEcoRouteSolver.MainWindow"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="Page Planner" Height="450" Width="800">
     <Window.Resources>
         <System:Double x:Key="LabelWidth">125</System:Double>
         <System:Double x:Key="DataInputWidth">200</System:Double>
     </Window.Resources>
-    <DockPanel>
-        <DockPanel DockPanel.Dock="Top" Margin="10">
-            <StackPanel Orientation="Vertical" Margin="0,0,10,0">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <Label Width="{DynamicResource LabelWidth}" Content="Hub ICAO"/>
-                    <TextBox x:Name="tICAO" Width="{DynamicResource DataInputWidth}" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <Label Width="{DynamicResource LabelWidth}" Content="Cost Per NM"/>
-                    <TextBox x:Name="tCPNM" Width="{DynamicResource DataInputWidth}" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <Label Width="{DynamicResource LabelWidth}" Content="Pax. Capacity"/>
-                    <TextBox x:Name="tPaxCapacity" Width="{DynamicResource DataInputWidth}" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <Label Width="{DynamicResource LabelWidth}" Content="Cruise Speed (knots)"/>
-                    <TextBox x:Name="tSpd" Width="{DynamicResource DataInputWidth}" />
-                </StackPanel>
-            </StackPanel>
-            <Border BorderThickness="1,0,0,0" BorderBrush="Gray">
-                <StackPanel Orientation="Vertical" Margin="10,0,0,0">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <Label Width="{DynamicResource LabelWidth}" Content="Number of Aircraft"/>
-                        <TextBox x:Name="tNumberOfAircraft" Width="{DynamicResource DataInputWidth}" />
+    <TabControl x:Name="tabControl" >
+        <TabItem Header="Hub-Spoke">
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Top" Margin="10">
+                    <StackPanel Orientation="Vertical" Margin="0,0,10,0">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <Label Width="{DynamicResource LabelWidth}" Content="Hub ICAO"/>
+                            <TextBox x:Name="tICAO" Width="{DynamicResource DataInputWidth}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <Label Width="{DynamicResource LabelWidth}" Content="Cost Per NM"/>
+                            <TextBox x:Name="tCPNM" Width="{DynamicResource DataInputWidth}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <Label Width="{DynamicResource LabelWidth}" Content="Pax. Capacity"/>
+                            <TextBox x:Name="tPaxCapacity" Width="{DynamicResource DataInputWidth}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <Label Width="{DynamicResource LabelWidth}" Content="Cruise Speed (knots)"/>
+                            <TextBox x:Name="tSpd" Width="{DynamicResource DataInputWidth}" />
+                        </StackPanel>
+                        <ProgressBar x:Name="pSolveTime" Height="30" Minimum="0" />
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <Label Width="{DynamicResource LabelWidth}" Content="Max Length (NM)"/>
-                        <TextBox x:Name="tMaxLength" Width="{DynamicResource DataInputWidth}" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <Label Width="{DynamicResource LabelWidth}" Content="Enroute Limit (hr)"/>
-                        <TextBox x:Name="tMaxEnrouteTime" Width="{DynamicResource DataInputWidth}" Text=""/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <Label Width="{DynamicResource LabelWidth}" Content="Solve Limit (sec)"/>
-                        <TextBox x:Name="tMaxSolveTime" Width="{DynamicResource DataInputWidth}" Text="300"/>
-                    </StackPanel>
-                    <Button x:Name="bSolve" Content="Solve" Height="30" Width="325" HorizontalAlignment="Left" Click="BSolve_Click"/>
+                    <Border BorderThickness="1,0,0,0" BorderBrush="Gray">
+                        <StackPanel Orientation="Vertical" Margin="10,0,0,0">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Label Width="{DynamicResource LabelWidth}" Content="Number of Aircraft"/>
+                                <TextBox x:Name="tNumberOfAircraft" Width="{DynamicResource DataInputWidth}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Label Width="{DynamicResource LabelWidth}" Content="Max Length (NM)"/>
+                                <TextBox x:Name="tMaxLength" Width="{DynamicResource DataInputWidth}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Label Width="{DynamicResource LabelWidth}" Content="Enroute Limit (hr)"/>
+                                <TextBox x:Name="tMaxEnrouteTime" Width="{DynamicResource DataInputWidth}" Text=""/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Label Width="{DynamicResource LabelWidth}" Content="Solve Limit (sec)"/>
+                                <TextBox x:Name="tMaxSolveTime" Width="{DynamicResource DataInputWidth}" Text="300"/>
+                            </StackPanel>
+                            <Button x:Name="bSolve" Content="Solve" Height="30" Width="325" HorizontalAlignment="Left" Click="BSolve_ClickAsync"/>
+                        </StackPanel>
+                    </Border>
+                </DockPanel>
+                <TextBox x:Name="tResult" AcceptsReturn="True" IsReadOnly="True" Text="Results will appear here..." />
+            </DockPanel>
+        </TabItem>
+        <TabItem Header="Aircraft Fleet">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,15">
+                    <ComboBox x:Name="cAircraftList" Width="{DynamicResource DataInputWidth}" Margin="0,0,15,0" />
+                    <Button Content="Add Aircraft" Padding="3"/>
                 </StackPanel>
-            </Border>
-        </DockPanel>
-        <TextBox x:Name="tResult" AcceptsReturn="True" IsReadOnly="True" Text="Results will appear here..." />
-    </DockPanel>
+                <DataGrid AutoGenerateColumns="False" >
+                    <DataGrid.Columns>
+                        <DataGridComboBoxColumn Header="Aircraft Type"/>
+                        <DataGridTextColumn Header="Registration"/>
+                        <DataGridTextColumn Header="Hub ICAO"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </TabItem>
+    </TabControl>
 </Window>

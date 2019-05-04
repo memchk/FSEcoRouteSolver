@@ -8,28 +8,58 @@
         <coordinates>-80.943100000000001,35.213999999999999</coordinates>
       </Point>
     </Placemark>
-    <Placemark id="KEQY-0">
-      <name>KEQY</name>
-      <Point>
-        <coordinates>-80.620199999999997,35.018799999999999</coordinates>
-      </Point>
-    </Placemark>
     <Placemark id="8A6-0">
       <name>8A6</name>
       <Point>
         <coordinates>-80.670100000000005,35.213799999999999</coordinates>
       </Point>
     </Placemark>
+    <Placemark id="KEQY-0">
+      <name>KEQY</name>
+      <Point>
+        <coordinates>-80.620199999999997,35.018799999999999</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="45J-0">
+      <name>45J</name>
+      <Point>
+        <coordinates>-79.759100000000004,34.891100000000002</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KMEB-0">
+      <name>KMEB</name>
+      <Point>
+        <coordinates>-79.365799999999993,34.791899999999998</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="2GC-0">
+      <name>2GC</name>
+      <Point>
+        <coordinates>-78.843500000000006,34.893700000000003</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="14NC-0">
+      <name>14NC</name>
+      <Point>
+        <coordinates>-77.549999999999997,34.5167</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="13NC-0">
+      <name>13NC</name>
+      <Point>
+        <coordinates>-77.249700000000004,35.033499999999997</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark id="KAKH-0">
+      <name>KAKH</name>
+      <Point>
+        <coordinates>-81.149900000000002,35.2027</coordinates>
+      </Point>
+    </Placemark>
     <Placemark id="KIPJ-0">
       <name>KIPJ</name>
       <Point>
         <coordinates>-81.161299999999997,35.4833</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="NC14-0">
-      <name>NC14</name>
-      <Point>
-        <coordinates>-81.639499999999998,36.196800000000003</coordinates>
       </Point>
     </Placemark>
     <Placemark id="0A9-0">
@@ -44,34 +74,10 @@
         <coordinates>-81.935100000000006,35.428199999999997</coordinates>
       </Point>
     </Placemark>
-    <Placemark id="KGSP-0">
-      <name>KGSP</name>
-      <Point>
-        <coordinates>-82.218900000000005,34.895699999999998</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="SC72-0">
-      <name>SC72</name>
-      <Point>
-        <coordinates>-82.148200000000003,34.822899999999997</coordinates>
-      </Point>
-    </Placemark>
     <Placemark id="0A2-0">
       <name>0A2</name>
       <Point>
         <coordinates>-82.567899999999995,34.090400000000002</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="27J-0">
-      <name>27J</name>
-      <Point>
-        <coordinates>-81.639700000000005,34.3093</coordinates>
-      </Point>
-    </Placemark>
-    <Placemark id="KUZA-0">
-      <name>KUZA</name>
-      <Point>
-        <coordinates>-81.057199999999995,34.9878</coordinates>
       </Point>
     </Placemark>
   </Folder>

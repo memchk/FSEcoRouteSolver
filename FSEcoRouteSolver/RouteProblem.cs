@@ -1,132 +1,57 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Google.OrTools.ConstraintSolver;
-using Google.Protobuf.WellKnownTypes;
-using CsvHelper;
-using System.IO;
-using System.Net;
-using SharpKml.Dom;
-using SharpKml.Base;
-using SharpKml.Engine;
+﻿// <copyright file="RouteProblem.cs" company="Carson Page">
+// Copyright (c) Carson Page. All rights reserved.
+// </copyright>
 
 namespace FSEcoRouteSolver
 {
-    class RouteProblem
+    using System;
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Linq;
+    using System.Net;
+    using CsvHelper;
+    using Google.OrTools.ConstraintSolver;
+    using Google.Protobuf.WellKnownTypes;
+    using SharpKml.Base;
+    using SharpKml.Dom;
+    using SharpKml.Engine;
+
+    internal class RouteProblem
     {
-        class Node
+        private readonly List<Node> nodes;
+        private readonly List<(int, int)> pdpPairs;
+        private readonly RoutingModel model;
+        private readonly RoutingIndexManager manager;
+        private readonly RoutingProblemParameters parameters;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RouteProblem"/> class.
+        /// </summary>
+        /// <param name="parameters">The routing Parameters.</param>
+        /// <param name="api_key">FSE data feed API key.</param>
+        public RouteProblem(RoutingProblemParameters parameters, string api_key)
         {
-            public String Name { get; set; }
-            public double Lat { get; set; }
-            public double Lon { get; set; }
-            public int Demand { get; set; }
-            public int AssignmentId { get; set; }
-            public int Pay { get; set; }
-            public string Commodity { get; set; }
-        }
+            this.parameters = parameters;
+            var hub = this.parameters.HubICAO;
 
-        class JobRecord
-        {
-            public String FromIcao { get; set; }
-            public String ToIcao { get; set; }
-            public int Amount { get; set; }
-            public decimal Pay { get; set; }
-            public bool PtAssignment { get; set; }
-            public string Commodity { get; set; }
-            public int Id { get; set; }
-        }
-
-        class IcaoDataRecord
-        {
-            public String icao { get; set; }
-            public double lat { get; set; }
-            public double lon { get; set; }
-        }
-
-        string hub;
-        readonly List<Node> nodes;
-        readonly List<(int, int)> pdpPairs;
-
-        class GreatCircleDistance
-        {
-            public long[,] cost_matrix;
-            public GreatCircleDistance(RoutingIndexManager manager, long cpnm, List<Node> nodes)
-            {
-                this.manager = manager;
-                cost_matrix = new long[nodes.Count, nodes.Count];
-                for (var i = 0; i < nodes.Count; i++)
-                {
-                    for (var j = 0; j < nodes.Count; j++)
-                    {
-                        if (nodes[i].Name == nodes[j].Name)
-                        {
-                            cost_matrix[i, j] = 0;
-                        }
-                        else
-                        {
-                            cost_matrix[i, j] = (long)Haversine.calculate(nodes[i].Lat, nodes[i].Lon, nodes[j].Lat, nodes[j].Lon) * cpnm;
-                        }
-                    }
-                }
-            }
-
-            public long Call(long from_idx, long to_idx)
-            {
-                var from = manager.IndexToNode(from_idx);
-                var to = manager.IndexToNode(to_idx);
-                return cost_matrix[from, to];
-            }
-
-            readonly RoutingIndexManager manager;
-        }
-
-        class TimeEvaluator
-        {
-            long[,] time_matrix;
-            public TimeEvaluator(GreatCircleDistance distance, RoutingIndexManager manager, long spd, List<Node> nodes)
-            {
-                this.manager = manager;
-                time_matrix = new long[nodes.Count, nodes.Count];
-                for (var i = 0; i < nodes.Count; i++)
-                {
-                    for (var j = 0; j < nodes.Count; j++)
-                    {
-                        time_matrix[i, j] = distance.cost_matrix[i, j] / spd;
-                    }
-                }
-            }
-
-            public long Call(long from_idx, long to_idx)
-            {
-                var from = manager.IndexToNode(from_idx);
-                var to = manager.IndexToNode(to_idx);
-                return time_matrix[from, to];
-            }
-
-            readonly RoutingIndexManager manager;
-        }
-
-        public RouteProblem(string _hub, string api_key)
-        {
-            hub = _hub.ToUpper();
             var icaodata = new CsvReader(File.OpenText(@"./icaodata.csv"));
             var icaodata_records = icaodata.GetRecords<IcaoDataRecord>().ToDictionary(x => x.icao, x => x);
             var webClient = new WebClient();
-            var to_jobs = new CsvReader(new StringReader(webClient.DownloadString(String.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsto&icaos={1}", api_key, hub))));
-            var from_jobs = new CsvReader(new StringReader(webClient.DownloadString(String.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsfrom&icaos={1}", api_key, hub))));
+            var to_jobs = new CsvReader(new StringReader(webClient.DownloadString(string.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsto&icaos={1}", api_key, hub))));
+            var from_jobs = new CsvReader(new StringReader(webClient.DownloadString(string.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsfrom&icaos={1}", api_key, hub))));
 
-            nodes = new List<Node>();
-            pdpPairs = new List<(int, int)>();
+            this.nodes = new List<Node>();
+            this.pdpPairs = new List<(int, int)>();
 
-            //"Depot" Node
-            nodes.Add(new Node
+            // "Depot" Node
+            this.nodes.Add(new Node
             {
                 Name = hub,
                 Demand = 0,
                 Lat = icaodata_records[hub].lat,
                 Lon = icaodata_records[hub].lon,
                 Pay = 0,
-                Commodity = "Root"
+                Commodity = "Root",
             });
 
             foreach (var x in to_jobs.GetRecords<JobRecord>())
@@ -135,7 +60,7 @@ namespace FSEcoRouteSolver
                 {
                     var not_hub = x.FromIcao.ToUpper();
 
-                    nodes.Add(new Node
+                    this.nodes.Add(new Node
                     {
                         Name = not_hub,
                         Demand = x.Amount,
@@ -143,10 +68,10 @@ namespace FSEcoRouteSolver
                         Lat = icaodata_records[not_hub].lat,
                         Lon = icaodata_records[not_hub].lon,
                         AssignmentId = x.Id,
-                        Commodity = x.Commodity
+                        Commodity = x.Commodity,
                     });
 
-                    nodes.Add(new Node
+                    this.nodes.Add(new Node
                     {
                         Name = hub,
                         Demand = -x.Amount,
@@ -154,10 +79,10 @@ namespace FSEcoRouteSolver
                         Lat = icaodata_records[hub].lat,
                         Lon = icaodata_records[hub].lon,
                         AssignmentId = x.Id,
-                        Commodity = x.Commodity
+                        Commodity = x.Commodity,
                     });
 
-                    pdpPairs.Add((nodes.Count - 2, nodes.Count - 1));
+                    this.pdpPairs.Add((this.nodes.Count - 2, this.nodes.Count - 1));
                 }
             }
 
@@ -167,7 +92,7 @@ namespace FSEcoRouteSolver
                 {
                     var not_hub = x.ToIcao.ToUpper();
 
-                    nodes.Add(new Node
+                    this.nodes.Add(new Node
                     {
                         Name = hub,
                         Demand = x.Amount,
@@ -175,9 +100,9 @@ namespace FSEcoRouteSolver
                         Lat = icaodata_records[hub].lat,
                         Lon = icaodata_records[hub].lon,
                         AssignmentId = x.Id,
-                        Commodity = x.Commodity
+                        Commodity = x.Commodity,
                     });
-                    nodes.Add(new Node
+                    this.nodes.Add(new Node
                     {
                         Name = not_hub,
                         Demand = -x.Amount,
@@ -185,189 +110,34 @@ namespace FSEcoRouteSolver
                         Lat = icaodata_records[not_hub].lat,
                         Lon = icaodata_records[not_hub].lon,
                         AssignmentId = x.Id,
-                        Commodity = x.Commodity
+                        Commodity = x.Commodity,
                     });
 
-                    pdpPairs.Add((nodes.Count - 2, nodes.Count - 1));
+                    this.pdpPairs.Add((this.nodes.Count - 2, this.nodes.Count - 1));
                 }
             }
+
+            this.manager = new RoutingIndexManager(this.nodes.Count, this.parameters.NumAircraft, 0);
+            this.model = new RoutingModel(this.manager);
+
+            this.SetupDimensions();
         }
 
-        string PrintSolution(int numAircraft, int cpnm, in RoutingIndexManager manager, in RoutingModel model, in Assignment solution)
+        public void EnableBookingFee()
         {
-            // Inspect solution.
-            long totalDistance = 0;
-            long totalPay = 0;
-            string output = "";
-            var distance = model.GetMutableDimension("distance");
-            var bookingFee = model.GetMutableDimension("booking_fee");
-            var assignmentCount = model.GetMutableDimension("assignment_count");
-            Document doc = new Document
+            var assignmentCount = this.model.GetMutableDimension("assignment_count");
+            var bookingNeg = -this.parameters.PaxCapacity;
+            this.model.AddConstantDimensionWithSlack(bookingNeg, this.parameters.PaxCapacity, 2 * this.parameters.PaxCapacity, true, "booking_fee");
+            var bookingFee = this.model.GetMutableDimension("booking_fee");
+            var totalPay = this.nodes.Select(n => n.Pay).Sum();
+            this.model.AddConstantDimensionWithSlack(0, totalPay, totalPay, true, "bf_prime");
+            var bfPrime = this.model.GetMutableDimension("bf_prime");
+
+            var solver = this.model.solver();
+
+            for (int i = 0; i < this.nodes.Count; i++)
             {
-                Id="Document"
-            };
-            for (int i = 0; i < numAircraft; ++i)
-            {
-
-                var routeAirport = new Folder
-                {
-                    Id = string.Format("airport-{0}", i),
-                    Name = string.Format("Solution Airports {0}", i)
-                };
-
-                output += string.Format("Route for Aircraft {0}:\n", i);
-                long routePay = 0;
-                var index = model.Start(i);
-                while (model.IsEnd(index) == false)
-                {
-                    var nodeIndex = manager.IndexToNode(index);
-                    var node = nodes[nodeIndex];
-                    var nodeId = node.Name + "-" + i;
-                    var local_f = routeAirport.FindFeature(nodeId);
-                    if(local_f == null)
-                    {
-                        var placemark = new Placemark
-                        {
-                            Id = nodeId,
-                            Name = node.Name,
-                            Geometry = new Point
-                            {
-                                Coordinate = new Vector(node.Lat, node.Lon)
-                            }
-                        };
-                        routeAirport.AddFeature(placemark);
-                    }
-                    var bf = solution.Value(bookingFee.CumulVar(index));
-                    var aob = solution.Value(assignmentCount.CumulVar(index));
-                    if (node.Demand > 0)
-                    {
-                        output += string.Format("Pickup: {0}: {1}x {2}\n", node.Name, node.Demand, node.Commodity);
-                    }
-                    else
-                    {
-                       
-                        output += string.Format("Deliver: {3} {1}x {2}, Pay: ${0}\n", node.Pay / 100, Math.Abs(node.Demand), node.Commodity, node.Name);
-                        routePay += node.Pay / 100;
-                    }
-                    output += string.Format("BF: {0}, AoB: {1}\n", bf, aob);
-                    var previousIndex = index;
-                    index = solution.Value(model.NextVar(index));
-                }
-                var distanceVar = distance.CumulVar(index);
-                long routeDistance = solution.Value(distanceVar) / 100;
-                output += string.Format("\n\n\n");
-                output += string.Format("Distance of the route: {0} NM\n", solution.Value(distanceVar) / 100);
-                output += string.Format("Gross pay of the route: ${0}\n", ((double)routePay));
-                totalDistance += routeDistance;
-                totalPay += routePay;
-                doc.AddFeature(routeAirport);
-            }
-
-
-            KmlFile kml = KmlFile.Create(doc, true);
-            using (FileStream stream = File.Create("output.kml"))
-            {
-                kml.Save(stream);
-            }
-            output += string.Format("Total distance of all routes: {0} NM\n", totalDistance);
-            output += string.Format("Total gross pay of all routes: ${0}\n", ((double)totalPay));
-
-            //Console.WriteLine("{0}", solution.Value(bookingFee.CumulVar(model.End(0))));
-
-            return output;
-        }
-
-
-        public string Solve(int numAircraft, int cpnm, int paxCapacity, int maxLength, int maxSolveSec, int maxTimeEnroute, int spd)
-        {
-            RoutingIndexManager manager = new RoutingIndexManager(nodes.Count, numAircraft, 0);
-            RoutingModel model = new RoutingModel(manager);
-
-            var distanceCostCall = new GreatCircleDistance(manager, cpnm, nodes);
-            model.SetArcCostEvaluatorOfAllVehicles(model.RegisterTransitCallback(distanceCostCall.Call));
-
-            var distanceCall = new GreatCircleDistance(manager, 100, nodes);
-            model.AddDimension(model.RegisterTransitCallback(distanceCall.Call), 0, maxLength, true, "distance");
-            var distance = model.GetMutableDimension("distance");
-
-            var timeCall = new TimeEvaluator(distanceCall, manager, spd, nodes);
-            model.AddDimension(model.RegisterTransitCallback(timeCall.Call), 0, maxTimeEnroute, true, "time");
-
-
-            var bookingNeg = -paxCapacity;
-            model.AddConstantDimensionWithSlack(bookingNeg, paxCapacity, 2*paxCapacity, true, "booking_fee");
-            var bookingFee = model.GetMutableDimension("booking_fee");
-
-            var totalPay = nodes.Select(n => n.Pay).Sum();
-
-            model.AddConstantDimensionWithSlack(0, totalPay, totalPay, true, "bf_prime");
-            var bfPrime = model.GetMutableDimension("bf_prime");
-
-            int assignmentCallBackIndex = model.RegisterUnaryTransitCallback(
-                (long fromIndex) =>
-                {
-                    var fromNode = manager.IndexToNode(fromIndex);
-                    return Math.Sign(nodes[fromNode].Demand);
-                }
-                );
-            model.AddDimension(
-              assignmentCallBackIndex, 0,  // null capacity slack
-              paxCapacity,   // vehicle maximum capacities
-              true,                      // start cumul to zero
-              "assignment_count");
-            var assignmentCount = model.GetMutableDimension("assignment_count");
-
-            int demandCallbackIndex = model.RegisterUnaryTransitCallback(
-                (long fromIndex) => {
-                    // Convert from routing variable Index to demand NodeIndex.
-                    var fromNode = manager.IndexToNode(fromIndex);
-                    return nodes[fromNode].Demand;
-                }
-            );
-
-            model.AddDimension(
-              demandCallbackIndex, 0,  // null capacity slack
-              paxCapacity,   // vehicle maximum capacities
-              true,                      // start cumul to zero
-              "capacity");
-
-            var capacity = model.GetMutableDimension("capacity");
-
-            var solver = model.solver();
-            foreach (var pair in pdpPairs)
-            {
-                (var pickup, var delivery) = pair;
-                var pickup_idx = manager.NodeToIndex(pickup);
-                var delivery_idx = manager.NodeToIndex(delivery);
-
-                model.AddPickupAndDelivery(pickup_idx, delivery_idx);
-                solver.Add(distance.CumulVar(pickup_idx) <= distance.CumulVar(delivery_idx));
-                solver.Add(model.VehicleVar(pickup_idx) == model.VehicleVar(delivery_idx));
-
-                solver.Add(model.ActiveVar(pickup_idx) == model.ActiveVar(delivery_idx));
-
-                model.AddDisjunction(new long[] { pickup_idx }, nodes[pickup].Pay);
-                model.AddDisjunction(new long[] { delivery_idx }, nodes[delivery].Pay);
-                //model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, nodes[delivery].Pay, 2);
-            }
-
-
-            //Booking Fee. Does not Implement the 5 assignment floor.
-            //for (int i = 0; i < nodes.Count; i++)
-            //{
-            //    var ii = manager.NodeToIndex(i);
-
-            //    solver.Add(bookingFee.CumulVar(ii) >= assignmentCount.CumulVar(ii));
-
-            //    var notNextIsZero = (assignmentCount.TransitVar(ii) + assignmentCount.CumulVar(ii)) != 0;
-            //    var delBookingFee = bookingFee.SlackVar(ii) + bookingNeg;
-
-            //    solver.Add((notNextIsZero * delBookingFee) >= 0);
-            //}
-
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                var ii = manager.NodeToIndex(i);
+                var ii = this.manager.NodeToIndex(i);
 
                 var acGtFive = assignmentCount.CumulVar(ii) > 5;
 
@@ -379,30 +149,276 @@ namespace FSEcoRouteSolver
                 solver.Add((notNextIsZero * delBookingFee) >= 0);
             }
 
-            for (int i = 0; i < nodes.Count; i++)
+            for (int i = 0; i < this.nodes.Count; i++)
             {
-                var ii = manager.NodeToIndex(i);
+                var ii = this.manager.NodeToIndex(i);
 
-                var math = solver.MakeDiv(nodes[i].Pay * bookingFee.CumulVar(ii), 100);
+                var math = solver.MakeDiv(this.nodes[i].Pay * bookingFee.CumulVar(ii), 100);
 
-                var prime = bfPrime.SlackVar(ii) == (math * model.ActiveVar(ii));
+                var prime = bfPrime.SlackVar(ii) == (math * this.model.ActiveVar(ii));
                 solver.Add(prime);
             }
 
             bfPrime.SetSpanCostCoefficientForAllVehicles(1);
+        }
+
+        public string Solve()
+        {
+            var solver = this.model.solver();
+            var distance = this.model.GetMutableDimension("distance");
+            foreach (var pair in this.pdpPairs)
+            {
+                (var pickup, var delivery) = pair;
+                var pickup_idx = this.manager.NodeToIndex(pickup);
+                var delivery_idx = this.manager.NodeToIndex(delivery);
+
+                this.model.AddPickupAndDelivery(pickup_idx, delivery_idx);
+                solver.Add(distance.CumulVar(pickup_idx) <= distance.CumulVar(delivery_idx));
+                solver.Add(this.model.VehicleVar(pickup_idx) == this.model.VehicleVar(delivery_idx));
+
+                solver.Add(this.model.ActiveVar(pickup_idx) == this.model.ActiveVar(delivery_idx));
+
+                this.model.AddDisjunction(new long[] { pickup_idx }, this.nodes[pickup].Pay);
+                this.model.AddDisjunction(new long[] { delivery_idx }, this.nodes[delivery].Pay);
+            }
 
             var routingParameters = operations_research_constraint_solver.DefaultRoutingSearchParameters();
             routingParameters.LocalSearchMetaheuristic = LocalSearchMetaheuristic.Types.Value.GuidedLocalSearch;
             routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.LocalCheapestInsertion;
             routingParameters.LogSearch = true;
-            routingParameters.TimeLimit = new Duration { Seconds = maxSolveSec };
+            routingParameters.TimeLimit = new Duration { Seconds = this.parameters.MaxSolveSec };
 
-            var solution = model.SolveWithParameters(routingParameters);
+            var solution = this.model.SolveWithParameters(routingParameters);
 
-            return PrintSolution(numAircraft, cpnm, manager, model, solution);
+            return this.PrintSolution(solution);
+        }
 
+        private string PrintSolution(in Assignment solution)
+        {
+            // Inspect solution.
+            long totalDistance = 0;
+            long totalPay = 0;
+            string output = string.Empty;
+            var distance = this.model.GetMutableDimension("distance");
+            Document doc = new Document
+            {
+                Id = "Document",
+            };
+            for (int i = 0; i < this.parameters.NumAircraft; ++i)
+            {
+                var routeAirport = new Folder
+                {
+                    Id = string.Format("airport-{0}", i),
+                    Name = string.Format("Solution Airports {0}", i),
+                };
+
+                output += string.Format("Route for Aircraft {0}:\n", i);
+                long routePay = 0;
+                var index = this.model.Start(i);
+                while (this.model.IsEnd(index) == false)
+                {
+                    var nodeIndex = this.manager.IndexToNode(index);
+                    var node = this.nodes[nodeIndex];
+                    var nodeId = node.Name + "-" + i;
+                    var local_f = routeAirport.FindFeature(nodeId);
+                    if (local_f == null)
+                    {
+                        var placemark = new Placemark
+                        {
+                            Id = nodeId,
+                            Name = node.Name,
+                            Geometry = new Point
+                            {
+                                Coordinate = new Vector(node.Lat, node.Lon),
+                            },
+                        };
+                        routeAirport.AddFeature(placemark);
+                    }
+
+                    if (node.Demand > 0)
+                    {
+                        output += string.Format("Pickup: {0}: {1}x {2}\n", node.Name, node.Demand, node.Commodity);
+                    }
+                    else
+                    {
+                        output += string.Format("Deliver: {3} {1}x {2}, Pay: ${0}\n", node.Pay / 100, Math.Abs(node.Demand), node.Commodity, node.Name);
+                        routePay += node.Pay / 100;
+                    }
+
+                    index = solution.Value(this.model.NextVar(index));
+                }
+
+                var distanceVar = distance.CumulVar(index);
+                long routeDistance = solution.Value(distanceVar) / 100;
+                output += string.Format("-------------------------");
+                output += string.Format("Distance of the route: {0} NM\n", solution.Value(distanceVar) / 100);
+                output += string.Format("Gross pay of the route: ${0}\n", (double)routePay);
+                output += "\n\n\n";
+                totalDistance += routeDistance;
+                totalPay += routePay;
+                doc.AddFeature(routeAirport);
+            }
+
+            KmlFile kml = KmlFile.Create(doc, true);
+            using (FileStream stream = File.Create("output.kml"))
+            {
+                kml.Save(stream);
+            }
+
+            output += string.Format("Total distance of all routes: {0} NM\n", totalDistance);
+            output += string.Format("Total gross pay of all routes: ${0}\n", (double)totalPay);
+
+            return output;
+        }
+
+        private void SetupDimensions()
+        {
+            var distanceCostCall = new GreatCircleDistance(this.manager, this.parameters.CostPerNM, this.nodes);
+            this.model.SetArcCostEvaluatorOfAllVehicles(this.model.RegisterTransitCallback(distanceCostCall.Call));
+
+            var distanceCall = new GreatCircleDistance(this.manager, 100, this.nodes);
+            this.model.AddDimension(this.model.RegisterTransitCallback(distanceCall.Call), 0, this.parameters.MaxLength, true, "distance");
+
+            var timeCall = new TimeEvaluator(distanceCall, this.manager, this.parameters.AircraftSpeed, this.nodes);
+            this.model.AddDimension(this.model.RegisterTransitCallback(timeCall.Call), 0, this.parameters.MaxTimeEnroute, true, "time");
+
+            int assignmentCallBackIndex = this.model.RegisterUnaryTransitCallback(
+                (long fromIndex) =>
+                {
+                    var fromNode = this.manager.IndexToNode(fromIndex);
+                    return Math.Sign(this.nodes[fromNode].Demand);
+                });
+            this.model.AddDimension(
+              assignmentCallBackIndex,
+              0,  // null capacity slack
+              this.parameters.PaxCapacity,   // vehicle maximum capacities
+              true,                      // start cumul to zero
+              "assignment_count");
+            var assignmentCount = this.model.GetMutableDimension("assignment_count");
+
+            int demandCallbackIndex = this.model.RegisterUnaryTransitCallback(
+                (long fromIndex) =>
+                {
+                    // Convert from routing variable Index to demand NodeIndex.
+                    var fromNode = this.manager.IndexToNode(fromIndex);
+                    return this.nodes[fromNode].Demand;
+                });
+
+            this.model.AddDimension(
+              demandCallbackIndex,
+              0,  // null capacity slack
+              this.parameters.PaxCapacity,   // vehicle maximum capacities
+              true,                      // start cumul to zero
+              "capacity");
+
+            var capacity = this.model.GetMutableDimension("capacity");
+        }
+
+        private class Node
+        {
+            public string Name { get; set; }
+
+            public double Lat { get; set; }
+
+            public double Lon { get; set; }
+
+            public int Demand { get; set; }
+
+            public int AssignmentId { get; set; }
+
+            public int Pay { get; set; }
+
+            public string Commodity { get; set; }
+        }
+
+        private class JobRecord
+        {
+            public string FromIcao { get; set; }
+
+            public string ToIcao { get; set; }
+
+            public int Amount { get; set; }
+
+            public decimal Pay { get; set; }
+
+            public bool PtAssignment { get; set; }
+
+            public string Commodity { get; set; }
+
+            public int Id { get; set; }
+        }
+
+#pragma warning disable SA1300 // Element should begin with upper-case letter
+#pragma warning disable IDE1006 // Element should begin with upper-case letter
+        private class IcaoDataRecord
+        {
+            public string icao { get; set; }
+
+            public double lat { get; set; }
+
+            public double lon { get; set; }
+        }
+#pragma warning restore SA1300 // Element should begin with upper-case letter
+#pragma warning restore IDE1006
+
+        private class GreatCircleDistance
+        {
+            private readonly RoutingIndexManager manager;
+
+            public GreatCircleDistance(RoutingIndexManager manager, long cpnm, List<Node> nodes)
+            {
+                this.manager = manager;
+                this.CostMatrix = new long[nodes.Count, nodes.Count];
+                for (var i = 0; i < nodes.Count; i++)
+                {
+                    for (var j = 0; j < nodes.Count; j++)
+                    {
+                        if (nodes[i].Name == nodes[j].Name)
+                        {
+                            this.CostMatrix[i, j] = 0;
+                        }
+                        else
+                        {
+                            this.CostMatrix[i, j] = (long)Haversine.calculate(nodes[i].Lat, nodes[i].Lon, nodes[j].Lat, nodes[j].Lon) * cpnm;
+                        }
+                    }
+                }
+            }
+
+            public long[,] CostMatrix { get; private set; }
+
+            public long Call(long from_idx, long to_idx)
+            {
+                var from = this.manager.IndexToNode(from_idx);
+                var to = this.manager.IndexToNode(to_idx);
+                return this.CostMatrix[from, to];
+            }
+        }
+
+        private class TimeEvaluator
+        {
+            private readonly RoutingIndexManager manager;
+            private readonly long[,] timeMatrix;
+
+            public TimeEvaluator(GreatCircleDistance distance, RoutingIndexManager manager, long spd, List<Node> nodes)
+            {
+                this.manager = manager;
+                this.timeMatrix = new long[nodes.Count, nodes.Count];
+                for (var i = 0; i < nodes.Count; i++)
+                {
+                    for (var j = 0; j < nodes.Count; j++)
+                    {
+                        this.timeMatrix[i, j] = distance.CostMatrix[i, j] / spd;
+                    }
+                }
+            }
+
+            public long Call(long from_idx, long to_idx)
+            {
+                var from = this.manager.IndexToNode(from_idx);
+                var to = this.manager.IndexToNode(to_idx);
+                return this.timeMatrix[from, to];
+            }
         }
     }
-
-
 }
