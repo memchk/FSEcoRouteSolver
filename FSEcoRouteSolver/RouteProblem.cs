@@ -18,6 +18,7 @@ namespace FSEcoRouteSolver
 
     internal class RouteProblem
     {
+        private const long ASSIGNMENTCOUNTMAX = 100;
         private readonly List<Node> nodes;
         private readonly List<(int, int)> pdpPairs;
         private readonly RoutingModel model;
@@ -128,48 +129,45 @@ namespace FSEcoRouteSolver
 
         public void EnableBookingFee()
         {
-            var assignmentCount = this.model.GetMutableDimension("assignment_count");
-            var fleet = this.parameters.Fleet;
-            var paxCapacities = fleet.Select(a => (long)a.Passengers).ToArray();
-            var maxCapacity = paxCapacities.Max();
+            var assignment_count = this.model.GetMutableDimension("assignment_count");
 
-            var bfCalls = paxCapacities.Select(c => this.model.RegisterUnaryTransitCallback(
-                (long index) => -c)).ToArray();
+            // var bfCalls = paxCapacities.Select(c => this.model.RegisterUnaryTransitCallback(
+            //     (long index) => -c)).ToArray();
 
-            this.model.AddDimensionWithVehicleTransitAndCapacity(bfCalls, maxCapacity * 2, paxCapacities, true, "booking_fee");
+            // this.model.AddDimensionWithVehicleTransitAndCapacity(bfCalls, maxCapacity * 2, paxCapacities, true, "booking_fee");
 
-            var bookingFee = this.model.GetMutableDimension("booking_fee");
-            var totalPay = this.nodes.Select(n => n.Pay).Sum();
-            this.model.AddConstantDimensionWithSlack(0, totalPay, totalPay, true, "bf_prime");
-            var bfPrime = this.model.GetMutableDimension("bf_prime");
+            this.model.AddConstantDimensionWithSlack(-ASSIGNMENTCOUNTMAX, ASSIGNMENTCOUNTMAX, 2 * ASSIGNMENTCOUNTMAX, false, "booking_fee");
 
+            var booking_fee = this.model.GetMutableDimension("booking_fee");
             var solver = this.model.solver();
 
-            for (int i = 0; i < this.nodes.Count; i++)
-            {
-                var ii = this.manager.NodeToIndex(i);
-
-                var acGtFive = assignmentCount.CumulVar(ii) > 5;
-
-                solver.Add(acGtFive * bookingFee.CumulVar(ii) >= acGtFive * assignmentCount.CumulVar(ii));
-
-                var notNextIsZero = (assignmentCount.TransitVar(ii) + assignmentCount.CumulVar(ii)) != 0;
-                var delBookingFee = bookingFee.SlackVar(ii) + bookingFee.TransitVar(ii);
-
-                solver.Add((notNextIsZero * delBookingFee) >= 0);
-            }
+            //var totalPay = this.nodes.Select(n => n.Pay).Sum();
+            //this.model.AddConstantDimensionWithSlack(0, totalPay, totalPay, true, "bf_prime");
+            //var bfPrime = this.model.GetMutableDimension("bf_prime");
 
             for (int i = 0; i < this.nodes.Count; i++)
             {
                 var ii = this.manager.NodeToIndex(i);
 
-                var math = solver.MakeDiv(this.nodes[i].Pay * bookingFee.CumulVar(ii), 100);
+                var is_lt_five = assignment_count.CumulVar(ii) < 5;
+                var not_is_lt_five = (1 - is_lt_five).Var();
 
-                var prime = bfPrime.SlackVar(ii) == (math * this.model.ActiveVar(ii));
-                solver.Add(prime);
+                var must_be_gt = booking_fee.CumulVar(ii) >= assignment_count.CumulVar(ii);
+                solver.Add(solver.MakeConditionalExpression(not_is_lt_five, must_be_gt, 1) == 1);
+
+                if (this.nodes[i].Demand < 0)
+                {
+                    var not_nnz = assignment_count.CumulVar(ii) > 1;
+                    var force_nochange = solver.MakeConditionalExpression(not_nnz, booking_fee.SlackVar(ii), ASSIGNMENTCOUNTMAX);
+                    solver.Add(force_nochange == ASSIGNMENTCOUNTMAX);
+                }
+                else
+                {
+                    booking_fee.SlackVar(ii).RemoveInterval(0, ASSIGNMENTCOUNTMAX - 1);
+                }
+
+                this.model.AddVariableMinimizedByFinalizer(booking_fee.CumulVar(ii));
             }
-
-            bfPrime.SetSpanCostCoefficientForAllVehicles(1);
         }
 
         public string Solve()
@@ -184,21 +182,24 @@ namespace FSEcoRouteSolver
                 var pickup_idx = this.manager.NodeToIndex(pickup);
                 var delivery_idx = this.manager.NodeToIndex(delivery);
 
-                this.model.AddPickupAndDelivery(pickup_idx, delivery_idx);
+                // this.model.AddPickupAndDelivery(pickup_idx, delivery_idx);
                 solver.Add(distance.CumulVar(pickup_idx) <= distance.CumulVar(delivery_idx));
                 solver.Add(this.model.VehicleVar(pickup_idx) == this.model.VehicleVar(delivery_idx));
 
-                // solver.Add(this.model.ActiveVar(pickup_idx) == this.model.ActiveVar(delivery_idx));
+                // this.model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, this.nodes[delivery].Pay, 2);
+                var pickup_didx = this.model.AddDisjunction(new long[] { pickup_idx }, this.nodes[delivery].Pay / 2);
+                var delivery_didx = this.model.AddDisjunction(new long[] { delivery_idx }, this.nodes[delivery].Pay / 2);
 
-                this.model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, this.nodes[delivery].Pay, 2);
+                this.model.AddPickupAndDeliverySets(pickup_didx, delivery_didx);
             }
+
+            this.model.SetPickupAndDeliveryPolicyOfAllVehicles(RoutingModel.PICKUP_AND_DELIVERY_NO_ORDER);
 
             var routingParameters = operations_research_constraint_solver.DefaultRoutingSearchParameters();
             routingParameters.LocalSearchMetaheuristic = LocalSearchMetaheuristic.Types.Value.GuidedLocalSearch;
-            routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.LocalCheapestArc;
+            routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.ParallelCheapestInsertion;
             routingParameters.LogSearch = true;
             routingParameters.TimeLimit = new Duration { Seconds = this.parameters.MaxSolveSec };
-
             var solution = this.model.SolveWithParameters(routingParameters);
 
             return this.PrintSolution(solution);
@@ -211,6 +212,8 @@ namespace FSEcoRouteSolver
             long totalPay = 0;
             string output = string.Empty;
             var distance = this.model.GetMutableDimension("distance");
+            // var booking_fee = this.model.GetDimensionOrDie("booking_fee");
+            // var assignment_count = this.model.GetMutableDimension("assignment_count");
             Document doc = new Document
             {
                 Id = "Document",
@@ -246,9 +249,15 @@ namespace FSEcoRouteSolver
                         routeAirport.AddFeature(placemark);
                     }
 
+
+                    // long bf_l, bf_u;
+                    // long thing = solution.Value(booking_fee.CumulVar(index));
+                    // output += string.Format("Booking Fee: {0}\n", thing);
+                    // output += string.Format("Assignment Count: {0}\n", solution.Value(assignment_count.CumulVar(index)));
                     if (node.Demand > 0)
                     {
-                        output += string.Format("Pickup: {0}: {1}x {2}\n", node.Name, node.Demand, node.Commodity);
+                        var delivery_node = this.nodes[nodeIndex + 1];
+                        output += string.Format("Pickup: {0} -->{3}: {1}x {2}\n", node.Name, node.Demand, node.Commodity, delivery_node.Name);
                     }
                     else
                     {
@@ -261,7 +270,7 @@ namespace FSEcoRouteSolver
 
                 var distanceVar = distance.CumulVar(index);
                 long routeDistance = solution.Value(distanceVar) / 100;
-                output += string.Format("-------------------------");
+                output += string.Format("-------------------------\n");
                 output += string.Format("Distance of the route: {0} NM\n", solution.Value(distanceVar) / 100);
                 output += string.Format("Gross pay of the route: ${0}\n", (double)routePay);
                 output += "\n\n\n";
@@ -284,6 +293,20 @@ namespace FSEcoRouteSolver
 
         private void SetupDimensions()
         {
+            // Count
+            var countCall = this.model.RegisterUnaryTransitCallback((from_idx) =>
+            {
+                if (this.nodes[this.manager.IndexToNode(from_idx)].Demand >= 0)
+                {
+                    return 1;
+                }
+                else
+                {
+                    return 0;
+                }
+            });
+            this.model.AddDimension(countCall, 0, ASSIGNMENTCOUNTMAX, true, "count");
+
             var fleet = this.parameters.Fleet;
 
             var paxCapacities = fleet.Select(a => (long)a.Passengers).ToArray();
@@ -321,6 +344,7 @@ namespace FSEcoRouteSolver
                     return Math.Sign(this.nodes[fromNode].Demand);
                 });
 
+            /*
             this.model.AddDimensionWithVehicleCapacity(
               assignmentCallBackIndex,
               0,  // null capacity slack
@@ -328,6 +352,9 @@ namespace FSEcoRouteSolver
               true,                      // start cumul to zero
               "assignment_count");
             var assignmentCount = this.model.GetMutableDimension("assignment_count");
+            */
+
+            this.model.AddDimension(assignmentCallBackIndex, 0, ASSIGNMENTCOUNTMAX, true, "assignment_count");
 
             int demandCallbackIndex = this.model.RegisterUnaryTransitCallback(
                 (long fromIndex) =>

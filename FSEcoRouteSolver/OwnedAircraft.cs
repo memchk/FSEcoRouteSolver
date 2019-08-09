@@ -12,7 +12,5 @@ namespace FSEcoRouteSolver
         }
 
         public string Registration { get; set; } = string.Empty;
-
-        public string Location { get; set; } = string.Empty;
     }
 }
