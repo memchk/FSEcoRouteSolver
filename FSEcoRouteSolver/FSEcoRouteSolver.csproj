@@ -164,7 +164,6 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-    <None Include="FSEcoRouteSolver_TemporaryKey.pfx" />
     <None Include="Properties\app.manifest" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -181,6 +180,12 @@
     </PackageReference>
     <PackageReference Include="Google.OrTools">
       <Version>7.2.6977</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AppCenter.Analytics">
+      <Version>2.2.1-preview</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AppCenter.Crashes">
+      <Version>2.2.1-preview</Version>
     </PackageReference>
     <PackageReference Include="SharpKml.Core">
       <Version>5.0.1</Version>

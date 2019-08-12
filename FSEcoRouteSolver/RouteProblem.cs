@@ -55,7 +55,7 @@ namespace FSEcoRouteSolver
                 Lat = icaodata_records[hub].lat,
                 Lon = icaodata_records[hub].lon,
                 Pay = 0,
-                Commodity = "Root",
+                Commodity = "Root"
             });
 
             foreach (var x in to_jobs.GetRecords<JobRecord>())
@@ -131,19 +131,10 @@ namespace FSEcoRouteSolver
         {
             var assignment_count = this.model.GetMutableDimension("assignment_count");
 
-            // var bfCalls = paxCapacities.Select(c => this.model.RegisterUnaryTransitCallback(
-            //     (long index) => -c)).ToArray();
-
-            // this.model.AddDimensionWithVehicleTransitAndCapacity(bfCalls, maxCapacity * 2, paxCapacities, true, "booking_fee");
-
             this.model.AddConstantDimensionWithSlack(-ASSIGNMENTCOUNTMAX, ASSIGNMENTCOUNTMAX, 2 * ASSIGNMENTCOUNTMAX, false, "booking_fee");
 
             var booking_fee = this.model.GetMutableDimension("booking_fee");
             var solver = this.model.solver();
-
-            //var totalPay = this.nodes.Select(n => n.Pay).Sum();
-            //this.model.AddConstantDimensionWithSlack(0, totalPay, totalPay, true, "bf_prime");
-            //var bfPrime = this.model.GetMutableDimension("bf_prime");
 
             for (int i = 0; i < this.nodes.Count; i++)
             {
@@ -173,9 +164,9 @@ namespace FSEcoRouteSolver
         public string Solve()
         {
             var solver = this.model.solver();
-            var fleet = this.parameters.Fleet;
 
             var distance = this.model.GetMutableDimension("distance");
+            var node_count = this.model.GetMutableDimension("node_count");
             foreach (var pair in this.pdpPairs)
             {
                 (var pickup, var delivery) = pair;
@@ -197,7 +188,11 @@ namespace FSEcoRouteSolver
 
             var routingParameters = operations_research_constraint_solver.DefaultRoutingSearchParameters();
             routingParameters.LocalSearchMetaheuristic = LocalSearchMetaheuristic.Types.Value.GuidedLocalSearch;
+            //routingParameters.LocalSearchOperators.UsePathLns = Google.OrTools.Util.OptionalBoolean.BoolTrue;
+            //routingParameters.LocalSearchOperators.UseInactiveLns = Google.OrTools.Util.OptionalBoolean.BoolTrue;
             routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.ParallelCheapestInsertion;
+            //routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.LocalCheapestInsertion;
+
             routingParameters.LogSearch = true;
             routingParameters.TimeLimit = new Duration { Seconds = this.parameters.MaxSolveSec };
             var solution = this.model.SolveWithParameters(routingParameters);
@@ -212,6 +207,9 @@ namespace FSEcoRouteSolver
             long totalPay = 0;
             string output = string.Empty;
             var distance = this.model.GetMutableDimension("distance");
+
+            var add_assign = @"http://server.fseconomy.net/userctl?event=Assignment&type=add&returnpage=/myflight.jsp&addToGroup=0";
+
             // var booking_fee = this.model.GetDimensionOrDie("booking_fee");
             // var assignment_count = this.model.GetMutableDimension("assignment_count");
             Document doc = new Document
@@ -229,6 +227,9 @@ namespace FSEcoRouteSolver
                 output += string.Format("Route for Aircraft {0}:\n", i);
                 long routePay = 0;
                 var index = this.model.Start(i);
+
+                var route_assign = add_assign.Clone();
+
                 while (this.model.IsEnd(index) == false)
                 {
                     var nodeIndex = this.manager.IndexToNode(index);
@@ -247,6 +248,12 @@ namespace FSEcoRouteSolver
                             },
                         };
                         routeAirport.AddFeature(placemark);
+                    }
+
+                    // If is not depot add assignment
+                    if (nodeIndex != 0)
+                    {
+                        route_assign += string.Format(@"&select={0}", node.AssignmentId);
                     }
 
 
@@ -273,7 +280,11 @@ namespace FSEcoRouteSolver
                 output += string.Format("-------------------------\n");
                 output += string.Format("Distance of the route: {0} NM\n", solution.Value(distanceVar) / 100);
                 output += string.Format("Gross pay of the route: ${0}\n", (double)routePay);
+                output += "\n";
+                output += "Copy to browser (logged in) to add to assignment:\n";
+                output += route_assign;
                 output += "\n\n\n";
+
                 totalDistance += routeDistance;
                 totalPay += routePay;
                 doc.AddFeature(routeAirport);
@@ -305,7 +316,9 @@ namespace FSEcoRouteSolver
                     return 0;
                 }
             });
-            this.model.AddDimension(countCall, 0, ASSIGNMENTCOUNTMAX, true, "count");
+            this.model.AddDimension(countCall, 0, ASSIGNMENTCOUNTMAX, true, "assignment_visit_count");
+
+            this.model.AddConstantDimension(1, this.model.Nodes() + 1, true, "node_count");
 
             var fleet = this.parameters.Fleet;
 
