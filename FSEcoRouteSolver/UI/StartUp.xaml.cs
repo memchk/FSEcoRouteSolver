@@ -72,7 +72,7 @@ namespace FSEcoRouteSolver.UI
             var ipEndPoint = new IPEndPoint(addresses[0], 123);
             // NTP uses UDP
 
-            using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            using (var socket = new Socket(ipEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp))
             {
                 socket.Connect(ipEndPoint);
 
