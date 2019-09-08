@@ -31,6 +31,7 @@ namespace FSEcoRouteSolver.UI
 
         private async void BSolve_ClickAsync(object sender, RoutedEventArgs e)
         {
+            LicenseManager.Instance.VerifyOrHalt();
 
             var buildFleet = new BuildFleet(this.aircraftList);
             buildFleet.ShowDialog();
@@ -58,7 +59,7 @@ namespace FSEcoRouteSolver.UI
                 var solveTask = Task.Run(() =>
                 {
                     RouteProblem rp = new RouteProblem(routingParameters, this.apiKey);
-                    rp.EnableBookingFee();
+                    // rp.EnableBookingFee();
                     return rp.Solve();
                 });
 

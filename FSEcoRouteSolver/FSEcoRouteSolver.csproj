@@ -96,6 +96,7 @@
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Core" />
@@ -115,7 +116,9 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Aircraft.cs" />
+    <Compile Include="API\TimeClient.generated.cs" />
     <Compile Include="Haversine.cs" />
+    <Compile Include="LicenseManager.cs" />
     <Compile Include="OwnedAircraft.cs" />
     <Compile Include="RouteProblem.cs" />
     <Compile Include="RoutingProblemParameters.cs" />
@@ -195,6 +198,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="System.ComponentModel.Annotations">
+      <Version>4.5.0</Version>
+    </PackageReference>
+    <PackageReference Include="TicketPunch.Core">
+      <Version>0.1.0.100</Version>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.7.2">
@@ -208,5 +217,6 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

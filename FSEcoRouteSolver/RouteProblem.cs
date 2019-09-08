@@ -8,6 +8,7 @@ namespace FSEcoRouteSolver
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Diagnostics;
     using System.Net;
     using CsvHelper;
     using Google.OrTools.ConstraintSolver;
@@ -55,7 +56,7 @@ namespace FSEcoRouteSolver
                 Lat = icaodata_records[hub].lat,
                 Lon = icaodata_records[hub].lon,
                 Pay = 0,
-                Commodity = "Root"
+                Commodity = "Root",
             });
 
             foreach (var x in to_jobs.GetRecords<JobRecord>())
@@ -177,27 +178,143 @@ namespace FSEcoRouteSolver
                 solver.Add(distance.CumulVar(pickup_idx) <= distance.CumulVar(delivery_idx));
                 solver.Add(this.model.VehicleVar(pickup_idx) == this.model.VehicleVar(delivery_idx));
 
-                // this.model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, this.nodes[delivery].Pay, 2);
-                var pickup_didx = this.model.AddDisjunction(new long[] { pickup_idx }, this.nodes[delivery].Pay / 2);
-                var delivery_didx = this.model.AddDisjunction(new long[] { delivery_idx }, this.nodes[delivery].Pay / 2);
+                //this.model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, this.nodes[delivery].Pay, 2);
 
+                var pickup_didx = this.model.AddDisjunction(new long[] { pickup_idx }, this.nodes[delivery].Pay);
+                var delivery_didx = this.model.AddDisjunction(new long[] { delivery_idx }, this.nodes[delivery].Pay);
+                //this.model.AddPickupAndDelivery(pickup_idx, delivery_idx);
                 this.model.AddPickupAndDeliverySets(pickup_didx, delivery_didx);
             }
 
-            this.model.SetPickupAndDeliveryPolicyOfAllVehicles(RoutingModel.PICKUP_AND_DELIVERY_NO_ORDER);
-
             var routingParameters = operations_research_constraint_solver.DefaultRoutingSearchParameters();
             routingParameters.LocalSearchMetaheuristic = LocalSearchMetaheuristic.Types.Value.GuidedLocalSearch;
-            //routingParameters.LocalSearchOperators.UsePathLns = Google.OrTools.Util.OptionalBoolean.BoolTrue;
-            //routingParameters.LocalSearchOperators.UseInactiveLns = Google.OrTools.Util.OptionalBoolean.BoolTrue;
             routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.ParallelCheapestInsertion;
-            //routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.LocalCheapestInsertion;
 
             routingParameters.LogSearch = true;
             routingParameters.TimeLimit = new Duration { Seconds = this.parameters.MaxSolveSec };
             var solution = this.model.SolveWithParameters(routingParameters);
 
+            this.PrintSolutionKML(solution);
             return this.PrintSolution(solution);
+        }
+
+        private Node GetNodeFromIndex(long index)
+        {
+            var idx = this.manager.IndexToNode(index);
+            return this.nodes[idx];
+        }
+
+        private bool AddAirportToFolder(Folder folder, Node n)
+        {
+            var airportId = n.Name;
+            var kmlAirport = folder.FindFeature(airportId);
+            if (kmlAirport == null)
+            {
+                var placemark = new Placemark
+                {
+                    Id = airportId,
+                    Name = n.Name,
+                    Geometry = new Point
+                    {
+                        Coordinate = new Vector(n.Lat, n.Lon),
+                    },
+                };
+                folder.AddFeature(placemark);
+                return true;
+            }
+
+            return false;
+        }
+
+        private Placemark NewTour(int tourId)
+        {
+            var tourPath = new LineString()
+            {
+                AltitudeMode = AltitudeMode.ClampToGround,
+                Tessellate = true,
+                Extrude = true,
+                Coordinates = new CoordinateCollection(),
+            };
+
+            return new Placemark
+            {
+                Name = string.Format("Tour {0}", tourId),
+                Geometry = tourPath,
+            };
+        }
+
+        private void PrintSolutionKML(in Assignment solution)
+        {
+            Document doc = new Document
+            {
+                Id = "Document",
+            };
+
+            for (int veh = 0; veh < this.parameters.Fleet.Count; ++veh)
+            {
+                var routeAirportFolder = new Folder
+                {
+                    Id = string.Format("airport-{0}", veh),
+                    Name = string.Format("Solution Airports for Aircraft {0}", veh),
+                };
+
+                var hub = this.parameters.HubICAO;
+                var tourCount = 0;
+
+                var index = this.model.Start(veh);
+                var tourPlacemark = this.NewTour(tourCount);
+                var tourPath = (LineString)tourPlacemark.Geometry;
+
+                Node prevNode = null;
+
+                while (this.model.IsEnd(index) == false)
+                {
+                    var node = this.GetNodeFromIndex(index);
+                    this.AddAirportToFolder(routeAirportFolder, node);
+
+                    if (prevNode == null)
+                    {
+                        tourPath.Coordinates.Add(new Vector(node.Lat, node.Lon));
+                    }
+                    else
+                    {
+                        if (prevNode != node && prevNode.Name != node.Name)
+                        {
+                            tourPath.Coordinates.Add(new Vector(node.Lat, node.Lon));
+                        }
+
+                        if (node.Name == hub && prevNode.Name != hub)
+                        {
+                            routeAirportFolder.AddFeature(tourPlacemark);
+                            tourPlacemark = this.NewTour(++tourCount);
+
+                            tourPath = (LineString)tourPlacemark.Geometry;
+                            tourPath.Coordinates.Add(new Vector(node.Lat, node.Lon));
+                        }
+                    }
+
+                    index = solution.Value(this.model.NextVar(index));
+                    prevNode = node;
+                }
+
+                // At the depot, finish up current tour if it was a one-off
+                var end_node = this.GetNodeFromIndex(index);
+                if (tourPath.Coordinates.Count > 0)
+                {
+                    tourPath.Coordinates.Add(new Vector(end_node.Lat, end_node.Lon));
+                    routeAirportFolder.AddFeature(tourPlacemark);
+                }
+
+                doc.AddFeature(routeAirportFolder);
+            }
+
+            KmlFile kml = KmlFile.Create(doc, true);
+            var kmlPath = Path.GetFullPath("output.kml");
+            using (FileStream stream = File.Create(kmlPath))
+            {
+                kml.Save(stream);
+                Process.Start(kmlPath);
+            }
         }
 
         private string PrintSolution(in Assignment solution)
@@ -206,24 +323,14 @@ namespace FSEcoRouteSolver
             long totalDistance = 0;
             long totalPay = 0;
             string output = string.Empty;
+            var hub = this.parameters.HubICAO;
             var distance = this.model.GetMutableDimension("distance");
-
             var add_assign = @"http://server.fseconomy.net/userctl?event=Assignment&type=add&returnpage=/myflight.jsp&addToGroup=0";
 
             // var booking_fee = this.model.GetDimensionOrDie("booking_fee");
             // var assignment_count = this.model.GetMutableDimension("assignment_count");
-            Document doc = new Document
-            {
-                Id = "Document",
-            };
             for (int i = 0; i < this.parameters.Fleet.Count; ++i)
             {
-                var routeAirport = new Folder
-                {
-                    Id = string.Format("airport-{0}", i),
-                    Name = string.Format("Solution Airports {0}", i),
-                };
-
                 output += string.Format("Route for Aircraft {0}:\n", i);
                 long routePay = 0;
                 var index = this.model.Start(i);
@@ -234,21 +341,6 @@ namespace FSEcoRouteSolver
                 {
                     var nodeIndex = this.manager.IndexToNode(index);
                     var node = this.nodes[nodeIndex];
-                    var nodeId = node.Name + "-" + i;
-                    var local_f = routeAirport.FindFeature(nodeId);
-                    if (local_f == null)
-                    {
-                        var placemark = new Placemark
-                        {
-                            Id = nodeId,
-                            Name = node.Name,
-                            Geometry = new Point
-                            {
-                                Coordinate = new Vector(node.Lat, node.Lon),
-                            },
-                        };
-                        routeAirport.AddFeature(placemark);
-                    }
 
                     // If is not depot add assignment
                     if (nodeIndex != 0)
@@ -256,11 +348,6 @@ namespace FSEcoRouteSolver
                         route_assign += string.Format(@"&select={0}", node.AssignmentId);
                     }
 
-
-                    // long bf_l, bf_u;
-                    // long thing = solution.Value(booking_fee.CumulVar(index));
-                    // output += string.Format("Booking Fee: {0}\n", thing);
-                    // output += string.Format("Assignment Count: {0}\n", solution.Value(assignment_count.CumulVar(index)));
                     if (node.Demand > 0)
                     {
                         var delivery_node = this.nodes[nodeIndex + 1];
@@ -275,6 +362,8 @@ namespace FSEcoRouteSolver
                     index = solution.Value(this.model.NextVar(index));
                 }
 
+                output += string.Format("Return to hub: {0}", hub);
+
                 var distanceVar = distance.CumulVar(index);
                 long routeDistance = solution.Value(distanceVar) / 100;
                 output += string.Format("-------------------------\n");
@@ -287,13 +376,6 @@ namespace FSEcoRouteSolver
 
                 totalDistance += routeDistance;
                 totalPay += routePay;
-                doc.AddFeature(routeAirport);
-            }
-
-            KmlFile kml = KmlFile.Create(doc, true);
-            using (FileStream stream = File.Create("output.kml"))
-            {
-                kml.Save(stream);
             }
 
             output += string.Format("Total distance of all routes: {0} NM\n", totalDistance);

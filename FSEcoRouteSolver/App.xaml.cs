@@ -14,10 +14,16 @@ namespace FSEcoRouteSolver
     /// </summary>
     public partial class App : Application
     {
-        protected override void OnStartup(StartupEventArgs e)
+        protected async override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
             AppCenter.Start("cbc8caae-5d68-429a-9ccb-dffba64934f0", typeof(Crashes), typeof(Analytics));
+            if (!await LicenseManager.Instance.VerifyStatus())
+            {
+                this.Shutdown();
+            }
         }
+
+
     }
 }
