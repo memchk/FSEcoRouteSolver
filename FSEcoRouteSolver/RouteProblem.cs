@@ -6,10 +6,12 @@ namespace FSEcoRouteSolver
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.IO;
     using System.Linq;
-    using System.Diagnostics;
     using System.Net;
+    using System.Net.Http;
+    using System.Threading.Tasks;
     using CsvHelper;
     using Google.OrTools.ConstraintSolver;
     using Google.Protobuf.WellKnownTypes;
@@ -20,11 +22,12 @@ namespace FSEcoRouteSolver
     internal class RouteProblem
     {
         private const long ASSIGNMENTCOUNTMAX = 100;
-        private readonly List<Node> nodes;
-        private readonly List<(int, int)> pdpPairs;
-        private readonly RoutingModel model;
-        private readonly RoutingIndexManager manager;
+        private static readonly HttpClient HttpClient = new HttpClient();
+        private readonly List<Node> nodes = new List<Node>();
+        private readonly List<(int, int)> pdpPairs = new List<(int, int)>();
         private readonly RoutingProblemParameters parameters;
+        private RoutingModel model;
+        private RoutingIndexManager manager;
 
         // private readonly List<GreatCircleDistance> costEvaluators;
 
@@ -32,134 +35,114 @@ namespace FSEcoRouteSolver
         /// Initializes a new instance of the <see cref="RouteProblem"/> class.
         /// </summary>
         /// <param name="parameters">The routing Parameters.</param>
-        /// <param name="api_key">FSE data feed API key.</param>
-        public RouteProblem(RoutingProblemParameters parameters, string api_key)
+        private RouteProblem(RoutingProblemParameters parameters)
         {
             this.parameters = parameters;
-            var hub = this.parameters.HubICAO;
-            var fleet = this.parameters.Fleet;
-
-            var icaodata = new CsvReader(File.OpenText(@"./icaodata.csv"));
-            var icaodata_records = icaodata.GetRecords<IcaoDataRecord>().ToDictionary(x => x.icao, x => x);
-            var webClient = new WebClient();
-            var to_jobs = new CsvReader(new StringReader(webClient.DownloadString(string.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsto&icaos={1}", api_key, hub))));
-            var from_jobs = new CsvReader(new StringReader(webClient.DownloadString(string.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsfrom&icaos={1}", api_key, hub))));
-
-            this.nodes = new List<Node>();
-            this.pdpPairs = new List<(int, int)>();
-
-            // "Depot" Node
-            this.nodes.Add(new Node
-            {
-                Name = hub,
-                Demand = 0,
-                Lat = icaodata_records[hub].lat,
-                Lon = icaodata_records[hub].lon,
-                Pay = 0,
-                Commodity = "Root",
-            });
-
-            foreach (var x in to_jobs.GetRecords<JobRecord>())
-            {
-                if (x.PtAssignment == true)
-                {
-                    var not_hub = x.FromIcao.ToUpper();
-
-                    this.nodes.Add(new Node
-                    {
-                        Name = not_hub,
-                        Demand = x.Amount,
-                        Pay = 0,
-                        Lat = icaodata_records[not_hub].lat,
-                        Lon = icaodata_records[not_hub].lon,
-                        AssignmentId = x.Id,
-                        Commodity = x.Commodity,
-                    });
-
-                    this.nodes.Add(new Node
-                    {
-                        Name = hub,
-                        Demand = -x.Amount,
-                        Pay = (int)Math.Round(x.Pay * 100),
-                        Lat = icaodata_records[hub].lat,
-                        Lon = icaodata_records[hub].lon,
-                        AssignmentId = x.Id,
-                        Commodity = x.Commodity,
-                    });
-
-                    this.pdpPairs.Add((this.nodes.Count - 2, this.nodes.Count - 1));
-                }
-            }
-
-            foreach (var x in from_jobs.GetRecords<JobRecord>())
-            {
-                if (x.PtAssignment == true)
-                {
-                    var not_hub = x.ToIcao.ToUpper();
-
-                    this.nodes.Add(new Node
-                    {
-                        Name = hub,
-                        Demand = x.Amount,
-                        Pay = 0,
-                        Lat = icaodata_records[hub].lat,
-                        Lon = icaodata_records[hub].lon,
-                        AssignmentId = x.Id,
-                        Commodity = x.Commodity,
-                    });
-                    this.nodes.Add(new Node
-                    {
-                        Name = not_hub,
-                        Demand = -x.Amount,
-                        Pay = (int)Math.Round(x.Pay * 100),
-                        Lat = icaodata_records[not_hub].lat,
-                        Lon = icaodata_records[not_hub].lon,
-                        AssignmentId = x.Id,
-                        Commodity = x.Commodity,
-                    });
-
-                    this.pdpPairs.Add((this.nodes.Count - 2, this.nodes.Count - 1));
-                }
-            }
-
-            this.manager = new RoutingIndexManager(this.nodes.Count, fleet.Count, 0);
-            this.model = new RoutingModel(this.manager);
-
-            this.SetupDimensions();
         }
 
-        public void EnableBookingFee()
+        public static async Task<RouteProblem> CreateProblem(RoutingProblemParameters parameters, string apiKey)
         {
-            var assignment_count = this.model.GetMutableDimension("assignment_count");
+            var routingProblem = new RouteProblem(parameters);
 
-            this.model.AddConstantDimensionWithSlack(-ASSIGNMENTCOUNTMAX, ASSIGNMENTCOUNTMAX, 2 * ASSIGNMENTCOUNTMAX, false, "booking_fee");
+            var hub = parameters.HubICAO;
+            var fleet = parameters.Fleet;
 
-            var booking_fee = this.model.GetMutableDimension("booking_fee");
-            var solver = this.model.solver();
-
-            for (int i = 0; i < this.nodes.Count; i++)
+            using (var icaofile = await GetICAOData())
             {
-                var ii = this.manager.NodeToIndex(i);
+                var icaodata = new CsvReader(icaofile);
+                var icaodata_records = icaodata.GetRecords<IcaoDataRecord>()
+                    .Where(x => parameters.IncludeSeaports || (x.type != "water"))
+                    .ToDictionary(x => x.icao, x => x);
+                var webClient = new WebClient();
+                var to_jobs = new CsvReader(new StringReader(webClient.DownloadString(string.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsto&icaos={1}", apiKey, hub))));
+                var from_jobs = new CsvReader(new StringReader(webClient.DownloadString(string.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsfrom&icaos={1}", apiKey, hub))));
+                webClient.Dispose();
 
-                var is_lt_five = assignment_count.CumulVar(ii) < 5;
-                var not_is_lt_five = (1 - is_lt_five).Var();
-
-                var must_be_gt = booking_fee.CumulVar(ii) >= assignment_count.CumulVar(ii);
-                solver.Add(solver.MakeConditionalExpression(not_is_lt_five, must_be_gt, 1) == 1);
-
-                if (this.nodes[i].Demand < 0)
+                // "Depot" Node
+                routingProblem.nodes.Add(new Node
                 {
-                    var not_nnz = assignment_count.CumulVar(ii) > 1;
-                    var force_nochange = solver.MakeConditionalExpression(not_nnz, booking_fee.SlackVar(ii), ASSIGNMENTCOUNTMAX);
-                    solver.Add(force_nochange == ASSIGNMENTCOUNTMAX);
-                }
-                else
+                    Name = hub,
+                    Demand = 0,
+                    Lat = icaodata_records[hub].lat,
+                    Lon = icaodata_records[hub].lon,
+                    Pay = 0,
+                    Commodity = "Root",
+                });
+
+                foreach (var x in to_jobs.GetRecords<JobRecord>())
                 {
-                    booking_fee.SlackVar(ii).RemoveInterval(0, ASSIGNMENTCOUNTMAX - 1);
+                    if (x.PtAssignment == true)
+                    {
+                        var not_hub = x.FromIcao.ToUpper();
+
+                        routingProblem.nodes.Add(new Node
+                        {
+                            Name = not_hub,
+                            Demand = x.Amount,
+                            Pay = 0,
+                            Lat = icaodata_records[not_hub].lat,
+                            Lon = icaodata_records[not_hub].lon,
+                            AssignmentId = x.Id,
+                            Commodity = x.Commodity,
+                        });
+
+                        routingProblem.nodes.Add(new Node
+                        {
+                            Name = hub,
+                            Demand = -x.Amount,
+                            Pay = (int)Math.Round(x.Pay * 100),
+                            Lat = icaodata_records[hub].lat,
+                            Lon = icaodata_records[hub].lon,
+                            AssignmentId = x.Id,
+                            Commodity = x.Commodity,
+                        });
+
+                        routingProblem.pdpPairs.Add((routingProblem.nodes.Count - 2, routingProblem.nodes.Count - 1));
+                    }
                 }
 
-                this.model.AddVariableMinimizedByFinalizer(booking_fee.CumulVar(ii));
+                foreach (var x in from_jobs.GetRecords<JobRecord>())
+                {
+                    if (x.PtAssignment == true)
+                    {
+                        var not_hub = x.ToIcao.ToUpper();
+
+                        routingProblem.nodes.Add(new Node
+                        {
+                            Name = hub,
+                            Demand = x.Amount,
+                            Pay = 0,
+                            Lat = icaodata_records[hub].lat,
+                            Lon = icaodata_records[hub].lon,
+                            AssignmentId = x.Id,
+                            Commodity = x.Commodity,
+                        });
+                        routingProblem.nodes.Add(new Node
+                        {
+                            Name = not_hub,
+                            Demand = -x.Amount,
+                            Pay = (int)Math.Round(x.Pay * 100),
+                            Lat = icaodata_records[not_hub].lat,
+                            Lon = icaodata_records[not_hub].lon,
+                            AssignmentId = x.Id,
+                            Commodity = x.Commodity,
+                        });
+
+                        routingProblem.pdpPairs.Add((routingProblem.nodes.Count - 2, routingProblem.nodes.Count - 1));
+                    }
+                }
             }
+
+            routingProblem.manager = new RoutingIndexManager(routingProblem.nodes.Count, fleet.Count, 0);
+            routingProblem.model = new RoutingModel(routingProblem.manager);
+
+            routingProblem.SetupDimensions();
+            // if (parameters.Fleet.Any(x => x.Passengers >= 19))
+            // {
+                routingProblem.EnableBookingFee();
+            // }
+
+            return routingProblem;
         }
 
         public string Solve()
@@ -168,6 +151,7 @@ namespace FSEcoRouteSolver
 
             var distance = this.model.GetMutableDimension("distance");
             var node_count = this.model.GetMutableDimension("node_count");
+
             foreach (var pair in this.pdpPairs)
             {
                 (var pickup, var delivery) = pair;
@@ -178,24 +162,89 @@ namespace FSEcoRouteSolver
                 solver.Add(distance.CumulVar(pickup_idx) <= distance.CumulVar(delivery_idx));
                 solver.Add(this.model.VehicleVar(pickup_idx) == this.model.VehicleVar(delivery_idx));
 
-                //this.model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, this.nodes[delivery].Pay, 2);
-
+                // this.model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, this.nodes[delivery].Pay, 2);
                 var pickup_didx = this.model.AddDisjunction(new long[] { pickup_idx }, this.nodes[delivery].Pay);
                 var delivery_didx = this.model.AddDisjunction(new long[] { delivery_idx }, this.nodes[delivery].Pay);
-                //this.model.AddPickupAndDelivery(pickup_idx, delivery_idx);
+
+                // this.model.AddPickupAndDelivery(pickup_idx, delivery_idx);
                 this.model.AddPickupAndDeliverySets(pickup_didx, delivery_didx);
             }
 
             var routingParameters = operations_research_constraint_solver.DefaultRoutingSearchParameters();
             routingParameters.LocalSearchMetaheuristic = LocalSearchMetaheuristic.Types.Value.GuidedLocalSearch;
             routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.ParallelCheapestInsertion;
-
             routingParameters.LogSearch = true;
             routingParameters.TimeLimit = new Duration { Seconds = this.parameters.MaxSolveSec };
+            routingParameters.LnsTimeLimit = new Duration { Seconds = 45 };
             var solution = this.model.SolveWithParameters(routingParameters);
 
             this.PrintSolutionKML(solution);
             return this.PrintSolution(solution);
+        }
+
+        private static async Task<StreamReader> GetICAOData()
+        {
+            StreamReader tmp;
+            try
+            {
+                tmp = File.OpenText(@"./icaodata.csv");
+            }
+            catch (FileNotFoundException)
+            {
+                using (var icaoData = File.Create(@"./icaodata.csv"))
+                {
+                    var stream = await HttpClient.GetStreamAsync(@"http://server.fseconomy.net/static/library/datafeed_icaodata.zip");
+                    var zip = new System.IO.Compression.ZipArchive(stream);
+                    var csvStream = zip.GetEntry("icaodata.csv").Open();
+                    await csvStream.CopyToAsync(icaoData);
+                    csvStream.Dispose();
+                    zip.Dispose();
+                    stream.Dispose();
+                }
+            }
+            finally
+            {
+                tmp = File.OpenText(@"./icaodata.csv");
+            }
+
+            return tmp;
+        }
+
+        private void EnableBookingFee()
+        {
+            var assignment_count = this.model.GetMutableDimension("assignment_count");
+            this.model.AddConstantDimensionWithSlack(-ASSIGNMENTCOUNTMAX, ASSIGNMENTCOUNTMAX, 2 * ASSIGNMENTCOUNTMAX, false, "booking_fee");
+            this.model.AddConstantDimensionWithSlack(0, long.MaxValue, long.MaxValue, false, "booking_fee_cost");
+            var booking_fee = this.model.GetMutableDimension("booking_fee");
+            var booking_fee_cost = this.model.GetMutableDimension("booking_fee_cost");
+            var solver = this.model.solver();
+
+            for (int i = 0; i < this.nodes.Count; i++)
+            {
+                var ii = this.manager.NodeToIndex(i);
+
+                var is_gtq_five = assignment_count.CumulVar(ii) >= 5;
+
+                var must_be_gt = booking_fee.CumulVar(ii) >= assignment_count.CumulVar(ii);
+                solver.Add(solver.MakeConditionalExpression(is_gtq_five, must_be_gt, 1) == 1);
+
+                if (this.nodes[i].Demand < 0)
+                {
+                    var not_nnz = assignment_count.CumulVar(ii) > 1;
+                    var force_nochange = solver.MakeConditionalExpression(not_nnz, booking_fee.SlackVar(ii), ASSIGNMENTCOUNTMAX);
+                    solver.Add(force_nochange == ASSIGNMENTCOUNTMAX);
+                    solver.Add(booking_fee_cost.SlackVar(ii) == booking_fee.CumulVar(ii) * (this.nodes[i].Pay / 100));
+                }
+                else
+                {
+                    booking_fee.SlackVar(ii).RemoveInterval(0, ASSIGNMENTCOUNTMAX - 1);
+                    booking_fee_cost.SlackVar(ii).SetValue(0);
+                }
+
+                //this.model.AddVariableMinimizedByFinalizer(booking_fee.CumulVar(ii));
+            }
+
+            booking_fee_cost.SetSpanCostCoefficientForAllVehicles(1);
         }
 
         private Node GetNodeFromIndex(long index)
@@ -327,7 +376,9 @@ namespace FSEcoRouteSolver
             var distance = this.model.GetMutableDimension("distance");
             var add_assign = @"http://server.fseconomy.net/userctl?event=Assignment&type=add&returnpage=/myflight.jsp&addToGroup=0";
 
-            // var booking_fee = this.model.GetDimensionOrDie("booking_fee");
+            // var booking_fee = this.model.GetMutableDimension("booking_fee");
+            // var booking_fee_cost = this.model.GetMutableDimension("booking_fee_cost");
+
             // var assignment_count = this.model.GetMutableDimension("assignment_count");
             for (int i = 0; i < this.parameters.Fleet.Count; ++i)
             {
@@ -347,6 +398,8 @@ namespace FSEcoRouteSolver
                     {
                         route_assign += string.Format(@"&select={0}", node.AssignmentId);
                     }
+
+                    // output += string.Format("\nBF: {0}, AC: {1}\n", solution.Value(booking_fee.CumulVar(index)), solution.Value(assignment_count.CumulVar(index)));
 
                     if (node.Demand > 0)
                     {
@@ -512,6 +565,8 @@ namespace FSEcoRouteSolver
             public double lat { get; set; }
 
             public double lon { get; set; }
+
+            public string type { get; set; }
         }
 #pragma warning restore SA1300 // Element should begin with upper-case letter
 #pragma warning restore IDE1006
@@ -530,7 +585,14 @@ namespace FSEcoRouteSolver
                     {
                         if (nodes[i].Name == nodes[j].Name)
                         {
-                            this.CostMatrix[i, j] = 0;
+                            if (nodes[i].Demand > 0 && nodes[j].Demand < 0)
+                            {
+                                this.CostMatrix[i, j] = long.MaxValue; // Make a Pickup before Delivery intractable at the same airport.
+                            }
+                            else
+                            {
+                                this.CostMatrix[i, j] = 0;
+                            }
                         }
                         else
                         {

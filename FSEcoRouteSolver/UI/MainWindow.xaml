@@ -35,11 +35,15 @@
                                 <Label Width="{DynamicResource LabelWidth}" Content="Solve Limit (sec)"/>
                                 <TextBox x:Name="tMaxSolveTime" Width="{DynamicResource DataInputWidth}" Text="300"/>
                             </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Label Width="{DynamicResource LabelWidth}" Content="Include Seaports"/>
+                                <CheckBox x:Name="cSeaport" VerticalAlignment="Center" />
+                            </StackPanel>
                             <Button x:Name="bSolve" Content="Solve" Height="30" Width="325" HorizontalAlignment="Left" Click="BSolve_ClickAsync"/>
                         </StackPanel>
                     </Border>
                 </DockPanel>
-                <TextBox x:Name="tResult" AcceptsReturn="True" IsReadOnly="True" Text="Results will appear here..." />
+                <TextBox x:Name="tResult" AcceptsReturn="True" VerticalScrollBarVisibility="Visible" IsReadOnly="True" Text="Results will appear here..." />
             </DockPanel>
         </TabItem>
     </TabControl>

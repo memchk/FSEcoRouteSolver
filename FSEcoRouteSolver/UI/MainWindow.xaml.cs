@@ -18,6 +18,7 @@ namespace FSEcoRouteSolver.UI
     {
         private readonly string apiKey;
         private readonly List<Aircraft> aircraftList;
+        private List<OwnedAircraft> ownedFleet;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MainWindow"/> class.
@@ -27,39 +28,57 @@ namespace FSEcoRouteSolver.UI
             this.InitializeComponent();
             this.apiKey = apiKey;
             this.aircraftList = Aircraft.ListFromFSEconomy(apiKey);
+            this.ownedFleet = new List<OwnedAircraft>();
         }
 
         private async void BSolve_ClickAsync(object sender, RoutedEventArgs e)
         {
-            LicenseManager.Instance.VerifyOrHalt();
+            TimeLicenseManager.Instance.VerifyOrHalt();
+            var buildFleet = new BuildFleet(this.aircraftList, this.ownedFleet);
 
-            var buildFleet = new BuildFleet(this.aircraftList);
+            if (!double.TryParse(this.tMaxEnrouteTime.Text, out double maxTimeD))
+            {
+                MessageBox.Show("Invalid Enroute Time! Must be entered as a decimal number.");
+                return;
+            }
+
+            var maxTime = (int)Math.Round(maxTimeD * 100);
+
+            if (!double.TryParse(this.tMaxLength.Text, out double maxLengthD))
+            {
+                MessageBox.Show("Invalid Max Length! Must be entered as a decimal number.");
+                return;
+            }
+
+            var maxLength = (int)Math.Round(maxLengthD * 100);
+
             buildFleet.ShowDialog();
-
-            var solveTime = int.Parse(this.tMaxSolveTime.Text);
-
-            this.pSolveTime.IsIndeterminate = true;
-            this.tResult.Text = "Solver running for " + solveTime + " seconds. Results will appear here.";
-
-            var icao = this.tICAO.Text;
-            var maxTime = (int)Math.Round(double.Parse(this.tMaxEnrouteTime.Text) * 100);
-            var maxLength = (int)Math.Round(double.Parse(this.tMaxLength.Text) * 100);
 
             if (buildFleet.DialogResult == true)
             {
+                var solveTime = int.Parse(this.tMaxSolveTime.Text);
+                this.pSolveTime.IsIndeterminate = true;
+                this.tResult.Text = "Solver running for " + solveTime + " seconds. Results will appear here.";
+
+                var icao = this.tICAO.Text;
+
+                // var maxTime = (int)Math.Round(double.Parse(this.tMaxEnrouteTime.Text) * 100);
+                // var maxLength = (int)Math.Round(double.Parse(this.tMaxLength.Text) * 100)
+                this.ownedFleet = buildFleet.AircraftFleet.ToList();
+
                 var routingParameters = new RoutingProblemParameters
                 {
-                    Fleet = buildFleet.AircraftFleet.ToList(),
+                    Fleet = this.ownedFleet,
                     HubICAO = icao,
                     MaxTimeEnroute = maxTime,
                     MaxLength = maxLength,
                     MaxSolveSec = solveTime,
+                    IncludeSeaports = (bool)this.cSeaport.IsChecked,
                 };
 
-                var solveTask = Task.Run(() =>
+                var solveTask = Task.Run(async () =>
                 {
-                    RouteProblem rp = new RouteProblem(routingParameters, this.apiKey);
-                    // rp.EnableBookingFee();
+                    RouteProblem rp = await RouteProblem.CreateProblem(routingParameters, this.apiKey);
                     return rp.Solve();
                 });
 
@@ -68,6 +87,5 @@ namespace FSEcoRouteSolver.UI
 
             this.pSolveTime.IsIndeterminate = false;
         }
-
     }
 }

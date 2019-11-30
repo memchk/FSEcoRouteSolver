@@ -9,12 +9,22 @@
     /// </summary>
     public partial class BuildFleet : Window
     {
-        internal BuildFleet(List<Aircraft> aircraftList)
+        internal BuildFleet(List<Aircraft> aircraftList, List<OwnedAircraft> ownedAircraft)
         {
             this.InitializeComponent();
             this.cAircraftList.ItemsSource = aircraftList;
-            this.AircraftFleet = new ObservableCollection<OwnedAircraft>();
+            if (ownedAircraft != null)
+            {
+                this.AircraftFleet = new ObservableCollection<OwnedAircraft>(ownedAircraft);
+            }
+            else
+            {
+                this.AircraftFleet = new ObservableCollection<OwnedAircraft>();
+            }
+
             this.tFleet.ItemsSource = this.AircraftFleet;
+            this.tFleet.CanUserDeleteRows = true;
+            this.tFleet.CanUserAddRows = false;
         }
 
         internal ObservableCollection<OwnedAircraft> AircraftFleet { get; private set; }

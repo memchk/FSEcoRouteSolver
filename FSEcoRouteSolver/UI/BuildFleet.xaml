@@ -12,7 +12,7 @@
         <System:Double x:Key="DataInputWidth">200</System:Double>
     </Window.Resources>
     <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="15,15,15,15" HorizontalAlignment="Left" Width="300">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="15,15,15,15" HorizontalAlignment="Left">
             <ComboBox x:Name="cAircraftList" Width="{DynamicResource DataInputWidth}" Margin="0,0,15,0">
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
@@ -21,6 +21,7 @@
                 </ComboBox.ItemTemplate>
             </ComboBox>
             <Button x:Name="bAddAircraft" Content="Add Aircraft" Padding="3" Click="AddAircraft_Click"/>
+            <Label Margin="25,0,0,0" Content="Select Row and press DEL to delete aircraft from active fleet." />
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Margin="15,15,15,15" HorizontalAlignment="Right">
             <Button x:Name="bSolve" Content="Continue..." Height="30" Width="75" HorizontalAlignment="Left" Click="BContinue_Click" />

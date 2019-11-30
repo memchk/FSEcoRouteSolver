@@ -1,12 +1,8 @@
 <project outputDir="C:\Users\Carson\source\repos\FSEcoRouteSolver\FSEcoRouteSolver\bin\x64\Release\Confused" baseDir="C:\Users\Carson\source\repos\FSEcoRouteSolver\FSEcoRouteSolver\bin\x64\Release" xmlns="http://confuser.codeplex.com">
-  <module path="SharpKml.Core.dll" />
-  <module path="System.ValueTuple.dll" />
-  <module path="CsvHelper.dll" />
   <module path="FSEcoRouteSolver.exe">
-    <rule pattern="true" preset="normal" inherit="false">
+    <rule pattern="true" preset="aggressive" inherit="false">
       <protection id="rename" action="remove" />
+      <protection id="ref proxy" action="remove" />
     </rule>
   </module>
-  <module path="Google.Protobuf.dll" />
-  <module path="Google.OrTools.dll" />
 </project>

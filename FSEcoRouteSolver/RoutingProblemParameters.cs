@@ -17,5 +17,7 @@ namespace FSEcoRouteSolver
         public string HubICAO { get; set; }
 
         public List<OwnedAircraft> Fleet { get; set; }
+
+        public bool IncludeSeaports { get; set; }
     }
 }

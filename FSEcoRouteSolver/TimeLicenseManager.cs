@@ -13,22 +13,22 @@ namespace FSEcoRouteSolver
     using System.Windows;
     using FSEcoRouteSolver.API;
 
-    internal class LicenseManager
+    internal class TimeLicenseManager
     {
         private readonly TimeClient timeClient = new TimeClient(new HttpClient());
 
-        private LicenseManager()
+        private TimeLicenseManager()
         {
         }
 
-        public static LicenseManager Instance { get; } = new LicenseManager();
+        public static TimeLicenseManager Instance { get; } = new TimeLicenseManager();
 
         public async Task<bool> VerifyStatus()
         {
             var response = await this.timeClient.Timezone2Async("Etc", "UTC");
             var dateTime = DateTime.Parse(response.Datetime);
 
-            return dateTime < new DateTime(2019, 10, 30);
+            return dateTime < new DateTime(2020, 2, 28);
         }
 
         public async void VerifyOrHalt()
