@@ -137,12 +137,16 @@ namespace FSEcoRouteSolver
             routingProblem.model = new RoutingModel(routingProblem.manager);
 
             routingProblem.SetupDimensions();
+#pragma warning disable SA1515 // Single-line comment should be preceded by blank line
+#pragma warning disable SA1512 // Single-line comments should not be followed by blank line
             // if (parameters.Fleet.Any(x => x.Passengers >= 19))
             // {
-                routingProblem.EnableBookingFee();
+            routingProblem.EnableBookingFee();
             // }
 
             return routingProblem;
+#pragma warning restore SA1512 // Single-line comments should not be followed by blank line
+#pragma warning restore SA1515 // Single-line comment should be preceded by blank line
         }
 
         public string Solve()
@@ -241,7 +245,7 @@ namespace FSEcoRouteSolver
                     booking_fee_cost.SlackVar(ii).SetValue(0);
                 }
 
-                //this.model.AddVariableMinimizedByFinalizer(booking_fee.CumulVar(ii));
+                // this.model.AddVariableMinimizedByFinalizer(booking_fee.CumulVar(ii));
             }
 
             booking_fee_cost.SetSpanCostCoefficientForAllVehicles(1);
@@ -400,7 +404,6 @@ namespace FSEcoRouteSolver
                     }
 
                     // output += string.Format("\nBF: {0}, AC: {1}\n", solution.Value(booking_fee.CumulVar(index)), solution.Value(assignment_count.CumulVar(index)));
-
                     if (node.Demand > 0)
                     {
                         var delivery_node = this.nodes[nodeIndex + 1];

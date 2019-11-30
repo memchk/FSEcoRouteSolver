@@ -1,4 +1,4 @@
-﻿// <copyright file="LicenseManager.cs" company="Carson Page">
+﻿// <copyright file="TimeLicenseManager.cs" company="Carson Page">
 // Copyright (c) Carson Page. All rights reserved.
 // </copyright>
 
