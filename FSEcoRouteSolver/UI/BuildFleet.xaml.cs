@@ -1,11 +1,15 @@
-﻿namespace FSEcoRouteSolver.UI
+﻿// <copyright file="BuildFleet.xaml.cs" company="Carson Page">
+// Copyright (c) Carson Page. All rights reserved.
+// </copyright>
+
+namespace FSEcoRouteSolver.UI
 {
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
     using System.Windows;
 
     /// <summary>
-    /// Interaction logic for BuildFleet.xaml
+    /// Interaction logic for BuildFleet.xaml.
     /// </summary>
     public partial class BuildFleet : Window
     {

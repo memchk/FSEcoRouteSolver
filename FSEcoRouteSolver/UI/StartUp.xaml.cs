@@ -1,4 +1,8 @@
-﻿namespace FSEcoRouteSolver.UI
+﻿// <copyright file="StartUp.xaml.cs" company="Carson Page">
+// Copyright (c) Carson Page. All rights reserved.
+// </copyright>
+
+namespace FSEcoRouteSolver.UI
 {
     using System;
     using System.Net;
@@ -6,10 +10,13 @@
     using System.Windows;
 
     /// <summary>
-    /// Interaction logic for StartUp.xaml
+    /// Interaction logic for StartUp.xaml.
     /// </summary>
     public partial class StartUp : Window
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StartUp"/> class.
+        /// </summary>
         public StartUp()
         {
             this.InitializeComponent();
@@ -38,6 +45,7 @@
                         "This will provide a license for 30 days.");
                     Application.Current.Shutdown();
                 }
+
                 var mainWindow = new MainWindow(apiKey);
                 mainWindow.Show();
                 mainWindow.Activate();
