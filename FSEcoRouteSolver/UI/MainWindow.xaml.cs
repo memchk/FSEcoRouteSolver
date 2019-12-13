@@ -10,31 +10,31 @@ namespace FSEcoRouteSolver.UI
     using System.Linq;
     using System.Threading.Tasks;
     using System.Windows;
+    using FSEcoRouteSolver.FSE;
 
     /// <summary>
     /// Interaction logic for MainWindow.xaml.
     /// </summary>
     public partial class MainWindow : Window
     {
-        private readonly string apiKey;
-        private readonly List<Aircraft> aircraftList;
+        private readonly FSEconomyClient fseClient;
         private List<OwnedAircraft> ownedFleet;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MainWindow"/> class.
         /// </summary>
-        public MainWindow(string apiKey)
+        public MainWindow(FSEconomyClient fseClient)
         {
             this.InitializeComponent();
-            this.apiKey = apiKey;
-            this.aircraftList = Aircraft.ListFromFSEconomy(apiKey);
+            this.fseClient = fseClient;
             this.ownedFleet = new List<OwnedAircraft>();
         }
 
         private async void BSolve_ClickAsync(object sender, RoutedEventArgs e)
         {
             TimeLicenseManager.Instance.VerifyOrHalt();
-            var buildFleet = new BuildFleet(this.aircraftList, this.ownedFleet);
+            var aircraftList = (await this.fseClient.AircraftConfigs).Select(x => x.Value).ToList();
+            var buildFleet = new BuildFleet(aircraftList, this.ownedFleet);
 
             if (!double.TryParse(this.tMaxEnrouteTime.Text, out double maxTimeD))
             {
@@ -62,8 +62,6 @@ namespace FSEcoRouteSolver.UI
 
                 var icao = this.tICAO.Text;
 
-                // var maxTime = (int)Math.Round(double.Parse(this.tMaxEnrouteTime.Text) * 100);
-                // var maxLength = (int)Math.Round(double.Parse(this.tMaxLength.Text) * 100)
                 this.ownedFleet = buildFleet.AircraftFleet.ToList();
 
                 var routingParameters = new RoutingProblemParameters
@@ -74,11 +72,12 @@ namespace FSEcoRouteSolver.UI
                     MaxLength = maxLength,
                     MaxSolveSec = solveTime,
                     IncludeSeaports = (bool)this.cSeaport.IsChecked,
+                    ForceSingleLoop = false,
                 };
 
                 var solveTask = Task.Run(async () =>
                 {
-                    RouteProblem rp = await RouteProblem.CreateProblem(routingParameters, this.apiKey);
+                    RouteProblem rp = await RouteProblem.CreateProblem(routingParameters, this.fseClient);
                     return rp.Solve();
                 });
 

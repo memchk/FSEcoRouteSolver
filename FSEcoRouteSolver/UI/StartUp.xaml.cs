@@ -8,6 +8,7 @@ namespace FSEcoRouteSolver.UI
     using System.Net;
     using System.Net.Sockets;
     using System.Windows;
+    using FSEcoRouteSolver.FSE;
 
     /// <summary>
     /// Interaction logic for StartUp.xaml.
@@ -37,7 +38,9 @@ namespace FSEcoRouteSolver.UI
                 Properties.Settings.Default.APIKey = apiKey;
                 Properties.Settings.Default.Save();
 
-                var licManager = new PaymentLicenseManager(apiKey);
+                var fseClient = new FSEconomyClient(apiKey);
+
+                var licManager = new PaymentLicenseManager(fseClient);
                 var status = await licManager.VerifyStatus();
                 if (!status)
                 {
@@ -46,7 +49,7 @@ namespace FSEcoRouteSolver.UI
                     Application.Current.Shutdown();
                 }
 
-                var mainWindow = new MainWindow(apiKey);
+                var mainWindow = new MainWindow(fseClient);
                 mainWindow.Show();
                 mainWindow.Activate();
                 this.Close();

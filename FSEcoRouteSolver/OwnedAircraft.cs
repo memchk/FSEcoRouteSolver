@@ -4,13 +4,12 @@
 
 namespace FSEcoRouteSolver
 {
-    internal class OwnedAircraft : Aircraft
-    {
-        public OwnedAircraft(Aircraft aircraft)
-            : base(aircraft.GallonsPerHour, aircraft.MakeModel, aircraft.Crew, aircraft.Seats, aircraft.CruiseSpeed)
-        {
-        }
+    using FSEcoRouteSolver.FSE;
 
+    internal class OwnedAircraft
+    {
         public string Registration { get; set; } = string.Empty;
+
+        public AircraftConfig AircraftConfig { get; set; }
     }
 }

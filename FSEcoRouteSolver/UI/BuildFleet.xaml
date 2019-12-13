@@ -26,8 +26,12 @@
         <StackPanel DockPanel.Dock="Bottom" Margin="15,15,15,15" HorizontalAlignment="Right">
             <Button x:Name="bSolve" Content="Continue..." Height="30" Width="75" HorizontalAlignment="Left" Click="BContinue_Click" />
         </StackPanel>
-        <DataGrid x:Name="tFleet">
-
+        <DataGrid x:Name="tFleet" AutoGenerateColumns="False" ItemsSource="{Binding AircraftFleet}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Binding="{Binding Registration}" Header="Tail #"/>
+                <DataGridTextColumn Binding="{Binding AircraftConfig.MakeModel}" Header="Make / Model" IsReadOnly="True" />
+                <DataGridTextColumn Binding="{Binding AircraftConfig.Passengers}" Header="Passengers" IsReadOnly="True" />
+            </DataGrid.Columns>
         </DataGrid>
     </DockPanel>
 </Window>

@@ -115,8 +115,19 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Aircraft.cs" />
     <Compile Include="API\TimeClient.generated.cs" />
+    <Compile Include="AsyncLazy.cs" />
+    <Compile Include="FSE\AircraftConfigItems.cs" />
+    <Compile Include="FSE\ApiException.cs" />
+    <Compile Include="FSE\Assignment.cs" />
+    <Compile Include="FSE\AircraftConfig.cs" />
+    <Compile Include="FSE\FSEconomyClient.cs" />
+    <Compile Include="FSE\FSEError.cs" />
+    <Compile Include="FSE\IcaoJobsFrom.cs" />
+    <Compile Include="FSE\IcaoJobsTo.cs" />
+    <Compile Include="FSE\IcaoRecord.cs" />
+    <Compile Include="FSE\Payment.cs" />
+    <Compile Include="FSE\Payments.cs" />
     <Compile Include="Haversine.cs" />
     <Compile Include="PaymentLicenseManager.cs" />
     <Compile Include="TimeLicenseManager.cs" />

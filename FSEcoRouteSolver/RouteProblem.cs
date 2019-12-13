@@ -13,6 +13,7 @@ namespace FSEcoRouteSolver
     using System.Net.Http;
     using System.Threading.Tasks;
     using CsvHelper;
+    using FSEcoRouteSolver.FSE;
     using Google.OrTools.ConstraintSolver;
     using Google.Protobuf.WellKnownTypes;
     using SharpKml.Base;
@@ -22,7 +23,6 @@ namespace FSEcoRouteSolver
     internal class RouteProblem
     {
         private const long ASSIGNMENTCOUNTMAX = 100;
-        private static readonly HttpClient HttpClient = new HttpClient();
         private readonly List<Node> nodes = new List<Node>();
         private readonly List<(int, int)> pdpPairs = new List<(int, int)>();
         private readonly RoutingProblemParameters parameters;
@@ -40,96 +40,110 @@ namespace FSEcoRouteSolver
             this.parameters = parameters;
         }
 
-        public static async Task<RouteProblem> CreateProblem(RoutingProblemParameters parameters, string apiKey)
+        public static async Task<RouteProblem> CreateProblem(RoutingProblemParameters parameters, FSEconomyClient fseClient)
         {
             var routingProblem = new RouteProblem(parameters);
 
             var hub = parameters.HubICAO;
             var fleet = parameters.Fleet;
 
-            using (var icaofile = await GetICAOData())
-            {
-                var icaodata = new CsvReader(icaofile);
-                var icaodata_records = icaodata.GetRecords<IcaoDataRecord>()
-                    .Where(x => parameters.IncludeSeaports || (x.type != "water"))
-                    .ToDictionary(x => x.icao, x => x);
-                var webClient = new WebClient();
-                var to_jobs = new CsvReader(new StringReader(webClient.DownloadString(string.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsto&icaos={1}", apiKey, hub))));
-                var from_jobs = new CsvReader(new StringReader(webClient.DownloadString(string.Format(@"http://server.fseconomy.net/data?userkey={0}&format=csv&query=icao&search=jobsfrom&icaos={1}", apiKey, hub))));
-                webClient.Dispose();
+            var from_jobs = await fseClient.GetJobsFromAsync(hub);
+            var to_jobs = await fseClient.GetJobsToAsync(hub);
 
-                // "Depot" Node
+            var filter_icaos = from_jobs
+                .SelectMany(x => new[] { x.FromIcao, x.ToIcao })
+                .Concat(to_jobs.SelectMany(x => new[] { x.FromIcao, x.ToIcao }))
+                .ToHashSet();
+
+            var icaodata = (await FSEconomyClient.ICAOData)
+                .Where(x => filter_icaos.Contains(x.Key) && (parameters.IncludeSeaports || x.Value.Type != "water"))
+                .ToDictionary(x => x.Key, x => x.Value);
+
+            // "Depot" Node
+            routingProblem.nodes.Add(new Node
+            {
+                Name = hub,
+                Demand = 0,
+                Lat = icaodata[hub].Latitude,
+                Lon = icaodata[hub].Longitude,
+                Pay = 0,
+                Commodity = "Root",
+            });
+
+            // If preventing multi-loops, insert exit node
+            if (parameters.ForceSingleLoop)
+            {
                 routingProblem.nodes.Add(new Node
                 {
                     Name = hub,
                     Demand = 0,
-                    Lat = icaodata_records[hub].lat,
-                    Lon = icaodata_records[hub].lon,
+                    Lat = icaodata[hub].Latitude,
+                    Lon = icaodata[hub].Longitude,
                     Pay = 0,
-                    Commodity = "Root",
+                    Commodity = "EXIT_NODE",
                 });
+            }
 
-                foreach (var x in to_jobs.GetRecords<JobRecord>())
+            foreach (var x in to_jobs)
+            {
+                if (x.PtAssignment == true)
                 {
-                    if (x.PtAssignment == true)
+                    var not_hub = x.FromIcao.ToUpper();
+
+                    routingProblem.nodes.Add(new Node
                     {
-                        var not_hub = x.FromIcao.ToUpper();
+                        Name = not_hub,
+                        Demand = x.Amount,
+                        Pay = 0,
+                        Lat = icaodata[not_hub].Latitude,
+                        Lon = icaodata[not_hub].Longitude,
+                        AssignmentId = x.Id,
+                        Commodity = x.Commodity,
+                    });
 
-                        routingProblem.nodes.Add(new Node
-                        {
-                            Name = not_hub,
-                            Demand = x.Amount,
-                            Pay = 0,
-                            Lat = icaodata_records[not_hub].lat,
-                            Lon = icaodata_records[not_hub].lon,
-                            AssignmentId = x.Id,
-                            Commodity = x.Commodity,
-                        });
+                    routingProblem.nodes.Add(new Node
+                    {
+                        Name = hub,
+                        Demand = -x.Amount,
+                        Pay = (int)Math.Round(x.Pay * 100),
+                        Lat = icaodata[hub].Latitude,
+                        Lon = icaodata[hub].Longitude,
+                        AssignmentId = x.Id,
+                        Commodity = x.Commodity,
+                    });
 
-                        routingProblem.nodes.Add(new Node
-                        {
-                            Name = hub,
-                            Demand = -x.Amount,
-                            Pay = (int)Math.Round(x.Pay * 100),
-                            Lat = icaodata_records[hub].lat,
-                            Lon = icaodata_records[hub].lon,
-                            AssignmentId = x.Id,
-                            Commodity = x.Commodity,
-                        });
-
-                        routingProblem.pdpPairs.Add((routingProblem.nodes.Count - 2, routingProblem.nodes.Count - 1));
-                    }
+                    routingProblem.pdpPairs.Add((routingProblem.nodes.Count - 2, routingProblem.nodes.Count - 1));
                 }
+            }
 
-                foreach (var x in from_jobs.GetRecords<JobRecord>())
+            foreach (var x in from_jobs)
+            {
+                if (x.PtAssignment == true)
                 {
-                    if (x.PtAssignment == true)
+                    var not_hub = x.ToIcao.ToUpper();
+
+                    routingProblem.nodes.Add(new Node
                     {
-                        var not_hub = x.ToIcao.ToUpper();
+                        Name = hub,
+                        Demand = x.Amount,
+                        Pay = 0,
+                        Lat = icaodata[hub].Latitude,
+                        Lon = icaodata[hub].Longitude,
+                        AssignmentId = x.Id,
+                        Commodity = x.Commodity,
+                    });
+                    routingProblem.nodes.Add(new Node
+                    {
+                        Name = not_hub,
+                        Demand = -x.Amount,
+                        Pay = (int)Math.Round(x.Pay * 100),
+                        Lat = icaodata[not_hub].Latitude,
+                        Lon = icaodata[not_hub].Longitude,
+                        AssignmentId = x.Id,
+                        Commodity = x.Commodity,
+                    });
 
-                        routingProblem.nodes.Add(new Node
-                        {
-                            Name = hub,
-                            Demand = x.Amount,
-                            Pay = 0,
-                            Lat = icaodata_records[hub].lat,
-                            Lon = icaodata_records[hub].lon,
-                            AssignmentId = x.Id,
-                            Commodity = x.Commodity,
-                        });
-                        routingProblem.nodes.Add(new Node
-                        {
-                            Name = not_hub,
-                            Demand = -x.Amount,
-                            Pay = (int)Math.Round(x.Pay * 100),
-                            Lat = icaodata_records[not_hub].lat,
-                            Lon = icaodata_records[not_hub].lon,
-                            AssignmentId = x.Id,
-                            Commodity = x.Commodity,
-                        });
-
-                        routingProblem.pdpPairs.Add((routingProblem.nodes.Count - 2, routingProblem.nodes.Count - 1));
-                    }
+                    routingProblem.pdpPairs.Add((routingProblem.nodes.Count - 2, routingProblem.nodes.Count - 1));
                 }
             }
 
@@ -154,7 +168,7 @@ namespace FSEcoRouteSolver
             var solver = this.model.solver();
 
             var distance = this.model.GetMutableDimension("distance");
-            var node_count = this.model.GetMutableDimension("node_count");
+            _ = this.model.GetMutableDimension("node_count");
 
             foreach (var pair in this.pdpPairs)
             {
@@ -167,51 +181,31 @@ namespace FSEcoRouteSolver
                 solver.Add(this.model.VehicleVar(pickup_idx) == this.model.VehicleVar(delivery_idx));
 
                 // this.model.AddDisjunction(new long[] { pickup_idx, delivery_idx }, this.nodes[delivery].Pay, 2);
-                var pickup_didx = this.model.AddDisjunction(new long[] { pickup_idx }, this.nodes[delivery].Pay);
+                var pickup_didx = this.model.AddDisjunction(new long[] { pickup_idx }, 0);
                 var delivery_didx = this.model.AddDisjunction(new long[] { delivery_idx }, this.nodes[delivery].Pay);
 
                 // this.model.AddPickupAndDelivery(pickup_idx, delivery_idx);
                 this.model.AddPickupAndDeliverySets(pickup_didx, delivery_didx);
             }
 
+            // Find exit node if exists, add disjunction
+            if (this.nodes[1].Commodity == "EXIT_NODE")
+            {
+                var idx = this.manager.NodeToIndex(1);
+                this.model.AddDisjunction(new[] { idx }, -1);
+            }
+
             var routingParameters = operations_research_constraint_solver.DefaultRoutingSearchParameters();
             routingParameters.LocalSearchMetaheuristic = LocalSearchMetaheuristic.Types.Value.GuidedLocalSearch;
             routingParameters.FirstSolutionStrategy = FirstSolutionStrategy.Types.Value.ParallelCheapestInsertion;
+
             routingParameters.LogSearch = true;
             routingParameters.TimeLimit = new Duration { Seconds = this.parameters.MaxSolveSec };
-            routingParameters.LnsTimeLimit = new Duration { Seconds = 45 };
+            routingParameters.LnsTimeLimit = new Duration { Seconds = 25 };
             var solution = this.model.SolveWithParameters(routingParameters);
 
             this.PrintSolutionKML(solution);
             return this.PrintSolution(solution);
-        }
-
-        private static async Task<StreamReader> GetICAOData()
-        {
-            StreamReader tmp;
-            try
-            {
-                tmp = File.OpenText(@"./icaodata.csv");
-            }
-            catch (FileNotFoundException)
-            {
-                using (var icaoData = File.Create(@"./icaodata.csv"))
-                {
-                    var stream = await HttpClient.GetStreamAsync(@"http://server.fseconomy.net/static/library/datafeed_icaodata.zip");
-                    var zip = new System.IO.Compression.ZipArchive(stream);
-                    var csvStream = zip.GetEntry("icaodata.csv").Open();
-                    await csvStream.CopyToAsync(icaoData);
-                    csvStream.Dispose();
-                    zip.Dispose();
-                    stream.Dispose();
-                }
-            }
-            finally
-            {
-                tmp = File.OpenText(@"./icaodata.csv");
-            }
-
-            return tmp;
         }
 
         private void EnableBookingFee()
@@ -296,7 +290,7 @@ namespace FSEcoRouteSolver
             };
         }
 
-        private void PrintSolutionKML(in Assignment solution)
+        private void PrintSolutionKML(in Google.OrTools.ConstraintSolver.Assignment solution)
         {
             Document doc = new Document
             {
@@ -370,7 +364,7 @@ namespace FSEcoRouteSolver
             }
         }
 
-        private string PrintSolution(in Assignment solution)
+        private string PrintSolution(in Google.OrTools.ConstraintSolver.Assignment solution)
         {
             // Inspect solution.
             long totalDistance = 0;
@@ -460,10 +454,10 @@ namespace FSEcoRouteSolver
 
             var fleet = this.parameters.Fleet;
 
-            var paxCapacities = fleet.Select(a => (long)a.Passengers).ToArray();
+            var paxCapacities = fleet.Select(a => (long)a.AircraftConfig.Passengers).ToArray();
 
             var costEvalulators = this.parameters.Fleet
-                .Select(a => new GreatCircleDistance(this.manager, a.CostPerNMCents(4.19), this.nodes)).ToList();
+                .Select(a => new PrimaryCostEvaluator(this.manager, a.AircraftConfig.CostPerNMCents(4.19), this.parameters.HubICAO, this.parameters.ForceSingleLoop, this.nodes)).ToList();
 
             for (int i = 0; i < costEvalulators.Count; i++)
             {
@@ -471,13 +465,13 @@ namespace FSEcoRouteSolver
                 this.model.SetArcCostEvaluatorOfVehicle(call, i);
             }
 
-            var distanceCall = new GreatCircleDistance(this.manager, 100, this.nodes);
+            var distanceCall = new GreatCircleDistance(this.manager, this.nodes);
             this.model.AddDimension(this.model.RegisterTransitCallback(distanceCall.Call), 0, this.parameters.MaxLength, true, "distance");
 
             var timeEvaluators = new List<TimeEvaluator>();
             for (int i = 0; i < fleet.Count; i++)
             {
-                var timeCall = new TimeEvaluator(costEvalulators[i], this.manager, fleet[i].CruiseSpeed, this.nodes);
+                var timeCall = new TimeEvaluator(distanceCall, this.manager, fleet[i].AircraftConfig.CruiseSpeed, this.nodes);
                 timeEvaluators.Add(timeCall);
             }
 
@@ -494,16 +488,6 @@ namespace FSEcoRouteSolver
                     var fromNode = this.manager.IndexToNode(fromIndex);
                     return Math.Sign(this.nodes[fromNode].Demand);
                 });
-
-            /*
-            this.model.AddDimensionWithVehicleCapacity(
-              assignmentCallBackIndex,
-              0,  // null capacity slack
-              paxCapacities,   // vehicle maximum capacities
-              true,                      // start cumul to zero
-              "assignment_count");
-            var assignmentCount = this.model.GetMutableDimension("assignment_count");
-            */
 
             this.model.AddDimension(assignmentCallBackIndex, 0, ASSIGNMENTCOUNTMAX, true, "assignment_count");
 
@@ -542,43 +526,11 @@ namespace FSEcoRouteSolver
             public string Commodity { get; set; }
         }
 
-        private class JobRecord
-        {
-            public string FromIcao { get; set; }
-
-            public string ToIcao { get; set; }
-
-            public int Amount { get; set; }
-
-            public decimal Pay { get; set; }
-
-            public bool PtAssignment { get; set; }
-
-            public string Commodity { get; set; }
-
-            public int Id { get; set; }
-        }
-
-#pragma warning disable SA1300 // Element should begin with upper-case letter
-#pragma warning disable IDE1006 // Element should begin with upper-case letter
-        private class IcaoDataRecord
-        {
-            public string icao { get; set; }
-
-            public double lat { get; set; }
-
-            public double lon { get; set; }
-
-            public string type { get; set; }
-        }
-#pragma warning restore SA1300 // Element should begin with upper-case letter
-#pragma warning restore IDE1006
-
-        private class GreatCircleDistance
+        private class PrimaryCostEvaluator
         {
             private readonly RoutingIndexManager manager;
 
-            public GreatCircleDistance(RoutingIndexManager manager, long cpnm, List<Node> nodes)
+            public PrimaryCostEvaluator(RoutingIndexManager manager, long cpnm, string hub, bool singleLoop, List<Node> nodes)
             {
                 this.manager = manager;
                 this.CostMatrix = new long[nodes.Count, nodes.Count];
@@ -599,7 +551,55 @@ namespace FSEcoRouteSolver
                         }
                         else
                         {
-                            this.CostMatrix[i, j] = (long)Haversine.Calculate(nodes[i].Lat, nodes[i].Lon, nodes[j].Lat, nodes[j].Lon) * cpnm;
+                            if (singleLoop)
+                            {
+                                if (nodes[i].Commodity == "EXIT_NODE")
+                                {
+                                    this.CostMatrix[i, j] = (long)Haversine.Calculate(nodes[i].Lat, nodes[i].Lon, nodes[j].Lat, nodes[j].Lon) * cpnm;
+                                }
+                                else if (nodes[i].Name == hub)
+                                {
+                                    this.CostMatrix[i, j] = long.MaxValue;
+                                }
+                            }
+                            else
+                            {
+                                this.CostMatrix[i, j] = (long)Haversine.Calculate(nodes[i].Lat, nodes[i].Lon, nodes[j].Lat, nodes[j].Lon) * cpnm;
+                            }
+                        }
+                    }
+                }
+            }
+
+            public long[,] CostMatrix { get; private set; }
+
+            public long Call(long from_idx, long to_idx)
+            {
+                var from = this.manager.IndexToNode(from_idx);
+                var to = this.manager.IndexToNode(to_idx);
+                return this.CostMatrix[from, to];
+            }
+        }
+
+        private class GreatCircleDistance
+        {
+            private readonly RoutingIndexManager manager;
+
+            public GreatCircleDistance(RoutingIndexManager manager, List<Node> nodes)
+            {
+                this.manager = manager;
+                this.CostMatrix = new long[nodes.Count, nodes.Count];
+                for (var i = 0; i < nodes.Count; i++)
+                {
+                    for (var j = 0; j < nodes.Count; j++)
+                    {
+                        if (nodes[i].Name == nodes[j].Name)
+                        {
+                            this.CostMatrix[i, j] = 0;
+                        }
+                        else
+                        {
+                            this.CostMatrix[i, j] = (long)Haversine.Calculate(nodes[i].Lat, nodes[i].Lon, nodes[j].Lat, nodes[j].Lon) * 100;
                         }
                     }
                 }

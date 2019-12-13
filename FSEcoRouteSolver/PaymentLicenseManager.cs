@@ -14,16 +14,16 @@ namespace FSEcoRouteSolver
     using System.Windows;
     using CsvHelper;
     using FSEcoRouteSolver.API;
+    using FSEcoRouteSolver.FSE;
 
     internal class PaymentLicenseManager
     {
-        private readonly HttpClient httpClient = new HttpClient();
         private readonly TimeClient timeClient = new TimeClient(new HttpClient());
-        private readonly string apiKey;
+        private readonly FSEconomyClient fseClient;
 
-        public PaymentLicenseManager(string apiKey)
+        public PaymentLicenseManager(FSEconomyClient fseClient)
         {
-            this.apiKey = apiKey;
+            this.fseClient = fseClient;
         }
 
         public async Task<bool> VerifyStatus()
@@ -34,35 +34,22 @@ namespace FSEcoRouteSolver
                 var dateTime = DateTime.Parse(response.Datetime);
                 try
                 {
-                    var paymentDataCurrent = await this.httpClient.GetStringAsync(string.Format(
-                       @"http://server.fseconomy.net/data?userkey={0}&format=csv&query=payments&search=monthyear&readaccesskey={0}&month={1}&year={2}",
-                       this.apiKey,
-                       dateTime.Month,
-                       dateTime.Year));
-
+                    var paymentCurrent = await this.fseClient.GetPaymentsAsync(dateTime.Month, dateTime.Year);
                     var prevMonth = dateTime.AddMonths(-1);
+                    var paymentPrevious = await this.fseClient.GetPaymentsAsync(prevMonth.Month, prevMonth.Year);
 
-                    var paymentDataPrev = await this.httpClient.GetStringAsync(string.Format(
-                        @"http://server.fseconomy.net/data?userkey={0}&format=csv&query=payments&search=monthyear&readaccesskey={0}&month={1}&year={2}",
-                        this.apiKey,
-                        prevMonth.Month,
-                        prevMonth.Year));
-
-                    var paymentCsvCur = new CsvReader(new StringReader(paymentDataCurrent));
-                    var paymentCsvPrev = new CsvReader(new StringReader(paymentDataPrev));
-
-                    return paymentCsvPrev.GetRecords<PaymentRecord>()
-                        .Concat(paymentCsvCur.GetRecords<PaymentRecord>())
+                    return paymentPrevious
+                        .Concat(paymentCurrent)
                         .Any(r => (r.To == "Page Planner" && r.Amount >= 10000 && dateTime.Subtract(r.Date).Days <= 30));
                 }
-                catch (CsvHelperException)
+                catch (FSE.ApiException<FSEError>)
                 {
                     MessageBox.Show("Invalid API Key, or you have hit FSE API limits. Try reseting your key.");
                     Application.Current.Shutdown();
                     return false;
                 }
             }
-            catch (ApiException)
+            catch (API.ApiException)
             {
                 MessageBox.Show("Unable to fetch time data!");
                 Application.Current.Shutdown();
@@ -76,17 +63,6 @@ namespace FSEcoRouteSolver
             {
                 Application.Current.Shutdown();
             }
-        }
-
-        private class PaymentRecord
-        {
-            public string From { get; set; }
-
-            public string To { get; set; }
-
-            public float Amount { get; set; }
-
-            public DateTime Date { get; set; }
         }
     }
 }

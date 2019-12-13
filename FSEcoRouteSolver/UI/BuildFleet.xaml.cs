@@ -7,13 +7,14 @@ namespace FSEcoRouteSolver.UI
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
     using System.Windows;
+    using FSEcoRouteSolver.FSE;
 
     /// <summary>
     /// Interaction logic for BuildFleet.xaml.
     /// </summary>
     public partial class BuildFleet : Window
     {
-        internal BuildFleet(List<Aircraft> aircraftList, List<OwnedAircraft> ownedAircraft)
+        internal BuildFleet(List<AircraftConfig> aircraftList, List<OwnedAircraft> ownedAircraft)
         {
             this.InitializeComponent();
             this.cAircraftList.ItemsSource = aircraftList;
@@ -35,10 +36,13 @@ namespace FSEcoRouteSolver.UI
 
         private void AddAircraft_Click(object sender, RoutedEventArgs e)
         {
-            var aircraft = (Aircraft)this.cAircraftList.SelectedItem;
+            var aircraft = (AircraftConfig)this.cAircraftList.SelectedItem;
             if (aircraft != null)
             {
-                var ownedAircraft = new OwnedAircraft(aircraft);
+                var ownedAircraft = new OwnedAircraft
+                {
+                    AircraftConfig = aircraft,
+                };
                 this.AircraftFleet.Add(ownedAircraft);
             }
         }

@@ -19,5 +19,7 @@ namespace FSEcoRouteSolver
         public List<OwnedAircraft> Fleet { get; set; }
 
         public bool IncludeSeaports { get; set; }
+
+        public bool ForceSingleLoop { get; set; }
     }
 }
