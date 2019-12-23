@@ -17,7 +17,7 @@ namespace FSEcoRouteSolver.Tests.FSE
             var client = new FSEconomyClient("badkey");
             await Assert.ThrowsAsync<ApiException<FSEError>>(() =>
             {
-                return client.GetJobsFromAsync("Poop");
+                return client.GetJobsFromAsync("KIDK");
             });
         }
     }
