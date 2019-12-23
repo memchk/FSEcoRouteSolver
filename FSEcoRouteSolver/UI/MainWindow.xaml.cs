@@ -32,7 +32,6 @@ namespace FSEcoRouteSolver.UI
 
         private async void BSolve_ClickAsync(object sender, RoutedEventArgs e)
         {
-            TimeLicenseManager.Instance.VerifyOrHalt();
             var aircraftList = (await this.fseClient.AircraftConfigs).Select(x => x.Value).ToList();
             var buildFleet = new BuildFleet(aircraftList, this.ownedFleet);
 

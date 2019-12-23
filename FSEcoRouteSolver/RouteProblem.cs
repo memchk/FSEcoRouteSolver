@@ -360,8 +360,8 @@ namespace FSEcoRouteSolver
             using (FileStream stream = File.Create(kmlPath))
             {
                 kml.Save(stream);
-                Process.Start(kmlPath);
             }
+            Process.Start(kmlPath);
         }
 
         private string PrintSolution(in Google.OrTools.ConstraintSolver.Assignment solution)

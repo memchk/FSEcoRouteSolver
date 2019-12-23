@@ -29,7 +29,7 @@ namespace FSEcoRouteSolver.UI
             }
         }
 
-        private async void BStart_Click(object sender, RoutedEventArgs e)
+        private void BStart_Click(object sender, RoutedEventArgs e)
         {
             this.bStart.IsEnabled = false;
             var apiKey = this.tAPIKey.Text;
@@ -39,16 +39,6 @@ namespace FSEcoRouteSolver.UI
                 Properties.Settings.Default.Save();
 
                 var fseClient = new FSEconomyClient(apiKey);
-
-                var licManager = new PaymentLicenseManager(fseClient);
-                var status = await licManager.VerifyStatus();
-                if (!status)
-                {
-                    MessageBox.Show("Please send $10000 to the FSE Group 'Page Planner' FROM YOUR PERSONAL ACCOUNT, and restart." +
-                        "This will provide a license for 30 days.");
-                    Application.Current.Shutdown();
-                }
-
                 var mainWindow = new MainWindow(fseClient);
                 mainWindow.Show();
                 mainWindow.Activate();

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FSEcoRouteSolver": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}
