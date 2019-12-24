@@ -16,9 +16,9 @@ jobs:
     - name: Test/Windows
       run: dotnet build -c Debug
     - name: Build/Windows
-      run: dotnet publish -c Release --self-contained
+      run: dotnet publish FSEcoRouteSolver -c Release --self-contained
     - name: Archive production artifacts
       uses: actions/upload-artifact@v1
       with:
-        name: dist
-        path: FSEcoRouteSolver\bin\Release\netcoreapp3.1\win-x64\publish
+        name: FSEcoRouteSolver.exe
+        path: FSEcoRouteSolver\bin\Release\netcoreapp3.1\win-x64\publish\FSEcoRouteSolver.exe
