@@ -13,5 +13,12 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: '3.1.100'
-    - name: Build with dotnet
-      run: dotnet build -c Release
+    - name: Test/Windows
+      run: dotnet build -c Debug
+    - name: Build/Windows
+      run: dotnet publish -c Release --self-contained
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v1
+      with:
+        name: dist
+        path: FSEcoRouteSolver\bin\Release\netcoreapp3.1\win-x64\publish
