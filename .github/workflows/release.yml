@@ -1,0 +1,25 @@
+on:
+  release:
+    types: [created]
+name: Handle Release
+jobs:
+  generate:
+    name: Create release-artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+      - uses: actions/checkout@v1
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '3.1.100'
+      - name: Test/Windows
+        run: dotnet test -c Debug
+      - name: Build/Windows
+        run: dotnet publish FSEcoRouteSolver -c Release --self-contained
+      - name: Upload the artifacts
+        uses: skx/github-action-publish-binaries@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: 'FSEcoRouteSolver\bin\Release\netcoreapp3.1\win-x64\publish\FSEcoRouteSolver.exe'
