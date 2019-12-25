@@ -204,7 +204,7 @@ namespace FSEcoRouteSolver
             routingParameters.LnsTimeLimit = new Duration { Seconds = 25 };
             var solution = this.model.SolveWithParameters(routingParameters);
 
-            this.PrintSolutionKML(solution);
+            // this.PrintSolutionKML(solution);
             return this.PrintSolution(solution);
         }
 
@@ -223,8 +223,7 @@ namespace FSEcoRouteSolver
 
                 var is_gtq_five = assignment_count.CumulVar(ii) >= 5;
 
-                var must_be_gt = booking_fee.CumulVar(ii) >= assignment_count.CumulVar(ii);
-                solver.Add(solver.MakeConditionalExpression(is_gtq_five, must_be_gt, 1) == 1);
+                solver.Add(solver.MakeConditionalExpression(is_gtq_five, booking_fee.CumulVar(ii), long.MaxValue) >= assignment_count.CumulVar(ii));
 
                 if (this.nodes[i].Demand < 0)
                 {
@@ -361,7 +360,13 @@ namespace FSEcoRouteSolver
             {
                 kml.Save(stream);
             }
-            Process.Start(kmlPath);
+
+            var proc = new ProcessStartInfo
+            {
+                UseShellExecute = true,
+                FileName = kmlPath,
+            };
+            Process.Start(proc);
         }
 
         private string PrintSolution(in Google.OrTools.ConstraintSolver.Assignment solution)
@@ -374,10 +379,10 @@ namespace FSEcoRouteSolver
             var distance = this.model.GetMutableDimension("distance");
             var add_assign = @"http://server.fseconomy.net/userctl?event=Assignment&type=add&returnpage=/myflight.jsp&addToGroup=0";
 
-            // var booking_fee = this.model.GetMutableDimension("booking_fee");
+            var booking_fee = this.model.GetMutableDimension("booking_fee");
             // var booking_fee_cost = this.model.GetMutableDimension("booking_fee_cost");
 
-            // var assignment_count = this.model.GetMutableDimension("assignment_count");
+            var assignment_count = this.model.GetMutableDimension("assignment_count");
             for (int i = 0; i < this.parameters.Fleet.Count; ++i)
             {
                 output += string.Format("Route for Aircraft {0}:\n", i);
@@ -397,7 +402,7 @@ namespace FSEcoRouteSolver
                         route_assign += string.Format(@"&select={0}", node.AssignmentId);
                     }
 
-                    // output += string.Format("\nBF: {0}, AC: {1}\n", solution.Value(booking_fee.CumulVar(index)), solution.Value(assignment_count.CumulVar(index)));
+                    output += string.Format("\nBF: {0}, AC: {1}\n", solution.Value(booking_fee.CumulVar(index)), solution.Value(assignment_count.CumulVar(index)));
                     if (node.Demand > 0)
                     {
                         var delivery_node = this.nodes[nodeIndex + 1];
