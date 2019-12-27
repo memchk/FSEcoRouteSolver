@@ -9,12 +9,12 @@
       <DockPanel>
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
           <StackPanel Margin="18" Spacing="4" Width="200">
-            <TextBox Watermark="Hub ICAO" />
-            <Button>Solve</Button>
+            <ComboBox Items="{Binding AirportList}" Watermark="Hub ICAO" />
+            <Button Command="{Binding Solve}">Solve</Button>
           </StackPanel>
           <StackPanel Margin="18" Spacing="4" Width="200">
-            <TextBox Watermark="Max Distance per Vehicle (NM)" />
-            <TextBox Watermark="Max Time per Vehicle (hr)" />
+            <TextBox UseFloatingWatermark="true" Watermark="Max Distance per Vehicle (NM)" Text="{Binding MaxDistanceNM}" />
+            <TextBox UseFloatingWatermark="true" Watermark="Max Time per Vehicle (hr)" Text="{Binding MaxTimeHr}" />
           </StackPanel>
         </StackPanel>
         <TextBox DockPanel.Dock="Bottom" />
